@@ -244,7 +244,22 @@
   #diffTable.show{ display:table; }
   .ver, .src, .ord, .size{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
   .size{ text-align: right; white-space: nowrap; }
-  .coll{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
+  .coll, .endo{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
+  .endo{ white-space: nowrap; }
+  #modTable.no-endo th.endo-col, #modTable.no-endo td.endo{ display: none; }
+  .missing-note{
+    display: none;
+    margin-top: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    line-height: 1.7;
+  }
+  .missing-note.show{ display:block; }
   .coll .optional{ opacity: .7; }
   /* Only shown when the loaded file actually contains collections. */
   #modTable.no-coll th.coll-col, #modTable.no-coll td.coll{ display: none; }
@@ -341,6 +356,7 @@
     </div>
     <div class="toggle-row">
       <label class="toggle-btn"><input type="checkbox" id="onlyEnabled" checked> Enabled mods only</label>
+      <label class="toggle-btn" id="notEndorsedField"><input type="checkbox" id="notEndorsed"> Not yet endorsed</label>
     </div>
   </div>
 
@@ -375,6 +391,7 @@
         <th>Version</th>
         <th class="size-col">Size</th>
         <th class="coll-col" title="Collection this mod was installed as part of">From collection</th>
+        <th class="endo-col" title="Whether you've endorsed this mod on Nexus">Endorsed</th>
         <th>Status</th>
         <th>Source</th>
       </tr>
@@ -392,6 +409,8 @@
     </thead>
     <tbody id="diffTableBody"></tbody>
   </table>
+
+  <div class="missing-note" id="missingNote"></div>
 
   <div class="empty-note" id="emptyNote">No mods match the current filter.</div>
 
@@ -441,6 +460,9 @@
   const searchField = document.getElementById('searchField');
   const sizeTotal = document.getElementById('sizeTotal');
   const sortOrderOption = document.getElementById('sortOrderOption');
+  const notEndorsed = document.getElementById('notEndorsed');
+  const notEndorsedField = document.getElementById('notEndorsedField');
+  const missingNote = document.getElementById('missingNote');
   const diffFilters = document.getElementById('diffFilters');
   const filterInputs = [...diffFilters.querySelectorAll('input[data-change]')];
 
@@ -723,6 +745,7 @@
       return {
         modId, name, version, enabled, sourceUrl, source, size,
         collections, collectionText: collectionLabel(collections),
+        endorsed: attr.endorsed,
       };
     });
 
@@ -735,6 +758,7 @@
 
     const view = viewState(buildRows(parsed, gameSelect.value, profileSelect.value), {
       onlyEnabled: onlyEnabled.checked,
+      notEndorsedOnly: notEndorsed.checked,
       search: searchInput.value,
       sort: sortSelect.value,
     });
@@ -743,6 +767,8 @@
     table.classList.toggle('no-order', !view.hasOrder);
     table.classList.toggle('no-size', !view.hasSize);
     table.classList.toggle('no-coll', !view.hasColl);
+    table.classList.toggle('no-endo', !view.hasEndo);
+    notEndorsedField.style.display = view.hasEndo ? '' : 'none';
     sortOrderOption.hidden = !view.hasOrder;
     // viewState falls back when the chosen sort has no data behind it; reflect
     // that back into the control so the two don't disagree.
@@ -798,6 +824,11 @@
       }
       tr.appendChild(collTd);
 
+      const endoTd = document.createElement('td');
+      endoTd.className = 'endo';
+      endoTd.textContent = endorsementLabel(r.endorsed);
+      tr.appendChild(endoTd);
+
       const statTd = document.createElement('td');
       if (r.enabled === null){
         statTd.innerHTML = '<span class="ver">—</span>';
@@ -830,6 +861,40 @@
     emptyNote.classList.toggle('show', rows.length === 0);
     summaryBar.classList.add('show');
     currentRows = rows;
+
+    renderMissingMembers();
+  }
+
+  // Collection members that aren't installed. Kept out of the table itself:
+  // the table is what you have, this is what a collection wanted.
+  function renderMissingMembers(){
+    missingNote.textContent = '';
+    if (!parsed || parsed.type !== 'vortex'){
+      missingNote.classList.remove('show');
+      return;
+    }
+    const gameMods = (parsed.mods && parsed.mods[gameSelect.value]) || {};
+    const missing = missingCollectionMembers(gameMods);
+    if (!missing.length){
+      missingNote.classList.remove('show');
+      return;
+    }
+    const shown = missing.slice(0, 12);
+    const head = missing.length === 1
+      ? '1 mod listed by a collection here isn\'t installed:'
+      : missing.length + ' mods listed by collections here aren\'t installed:';
+    missingNote.appendChild(document.createTextNode(head));
+    shown.forEach(m => {
+      missingNote.appendChild(document.createElement('br'));
+      missingNote.appendChild(document.createTextNode(
+        '  · ' + m.name + '  — ' + m.collection + (m.optional ? ' (optional)' : '')));
+    });
+    if (missing.length > shown.length){
+      missingNote.appendChild(document.createElement('br'));
+      missingNote.appendChild(document.createTextNode(
+        '  · and ' + (missing.length - shown.length) + ' more'));
+    }
+    missingNote.classList.add('show');
   }
 
   // A profile present in one file may not exist in the other; fall back to
@@ -971,6 +1036,7 @@
       controls.classList.remove('show');
       diffFilters.classList.add('show');
       sizeTotal.textContent = '';
+      missingNote.classList.remove('show');
       renderDiff();
     } else {
       diffTable.classList.remove('show');
@@ -989,6 +1055,7 @@
   }
 
   onlyEnabled.addEventListener('change', refresh);
+  notEndorsed.addEventListener('change', refresh);
   searchInput.addEventListener('input', () => { if (view === 'list') render(); });
   sortSelect.addEventListener('change', refresh);
   filterInputs.forEach(i => i.addEventListener('change', () => { if (view === 'diff') renderDiff(); }));
@@ -1048,7 +1115,9 @@
   // tool infers rather than reports. Measured at ~94% against real data; an
   // unmatched rule simply means that member isn't installed, which is normal
   // for a 'recommends' the user declined.
-  function collectionMembership(gameMods){
+  // Built once and shared by membership and missing-member detection, so the
+  // two can never disagree about what counts as a match.
+  function indexModsForMatching(gameMods){
     const byMd5 = new Map(), byLogical = new Map(), byName = new Map();
     const remember = (map, key, modId) => {
       if (key && !map.has(key)) map.set(key, modId);
@@ -1061,8 +1130,24 @@
       remember(byName, a.customFileName, modId);
       remember(byName, a.name, modId);
     });
+    return { byMd5, byLogical, byName };
+  }
 
-    const out = new Map();
+  // Most precise key first: an md5 match is exact, a name match is not.
+  function matchRule(index, ref){
+    const r = ref || {};
+    return index.byMd5.get(r.fileMD5)
+      || index.byLogical.get(r.logicalFileName)
+      || index.byName.get(r.description)
+      || null;
+  }
+
+  // Rules that match nothing installed. These aren't failures: they're the
+  // collection's members you don't have, which is worth telling someone
+  // rather than discarding.
+  function missingCollectionMembers(gameMods){
+    const index = indexModsForMatching(gameMods);
+    const out = [];
     Object.keys(gameMods).forEach(collectionId => {
       const mod = gameMods[collectionId] || {};
       if (mod.type !== 'collection') return;
@@ -1070,10 +1155,26 @@
       const label = a.customFileName || a.modName || a.name || collectionId;
       (mod.rules || []).forEach(rule => {
         const ref = (rule || {}).reference || {};
-        // Most precise key first: an md5 match is exact, a name match is not.
-        const hit = byMd5.get(ref.fileMD5)
-          || byLogical.get(ref.logicalFileName)
-          || byName.get(ref.description);
+        if (matchRule(index, ref)) return;
+        const name = ref.description || ref.logicalFileName;
+        if (!name) return;
+        if (out.some(m => m.name === name && m.collection === label)) return;
+        out.push({ name, collection: label, optional: (rule || {}).type === 'recommends' });
+      });
+    });
+    return out;
+  }
+
+  function collectionMembership(gameMods){
+    const index = indexModsForMatching(gameMods);
+    const out = new Map();
+    Object.keys(gameMods).forEach(collectionId => {
+      const mod = gameMods[collectionId] || {};
+      if (mod.type !== 'collection') return;
+      const a = mod.attributes || {};
+      const label = a.customFileName || a.modName || a.name || collectionId;
+      (mod.rules || []).forEach(rule => {
+        const hit = matchRule(index, (rule || {}).reference);
         if (!hit || hit === collectionId) return;
         if (!out.has(hit)) out.set(hit, []);
         const list = out.get(hit);
@@ -1119,6 +1220,9 @@
     if (options.onlyEnabled && rows.some(r => r.enabled !== null)){
       rows = rows.filter(r => r.enabled !== false);
     }
+    if (options.notEndorsedOnly){
+      rows = rows.filter(r => isUnendorsed(r.endorsed));
+    }
 
     // Column visibility is decided from the unfiltered set, so searching down
     // to a single mod with no recorded size doesn't make the column vanish.
@@ -1130,6 +1234,7 @@
     const hasOrder = unfiltered.some(r => typeof r.order === 'number');
     const hasSize = unfiltered.some(r => typeof r.size === 'number');
     const hasColl = unfiltered.some(r => r.collectionText);
+    const hasEndo = unfiltered.some(r => r.endorsed !== undefined && r.endorsed !== null);
 
     // Falling back rather than sorting by a field that isn't there.
     let sort = options.sort || 'name';
@@ -1142,10 +1247,25 @@
 
     const totalBytes = rows.reduce((sum, r) => sum + (typeof r.size === 'number' ? r.size : 0), 0);
     return {
-      rows, sort, hasOrder, hasSize, hasColl, totalBytes,
+      rows, sort, hasOrder, hasSize, hasColl, hasEndo, totalBytes,
       sizeTotalText: totalBytes > 0 ? '  ·  ' + formatSize(totalBytes) + ' on disk' : '',
       emptyNote: search.trim() ? 'No mods match that search.' : 'No mods match the current filter.',
     };
+  }
+
+  // Vortex records endorsement as Endorsed / Undecided / Abstained, and leaves
+  // it unset for mods that can't be endorsed at all (anything not from Nexus).
+  // "Not yet endorsed" means genuinely undecided -- Abstained is a decision,
+  // and an unset value means the question doesn't apply.
+  function endorsementLabel(value){
+    if (value === 'Endorsed') return 'yes';
+    if (value === 'Abstained') return 'abstained';
+    if (value === 'Undecided' || value === 'pending') return 'not yet';
+    return '—';
+  }
+
+  function isUnendorsed(value){
+    return value === 'Undecided' || value === 'pending';
   }
 
   function statusLabel(enabled){
@@ -1232,9 +1352,11 @@
     const withOrder = exportHasOrder();
     const withSize = currentRows.some(r => typeof r.size === 'number');
     const withColl = currentRows.some(r => r.collectionText);
+    const withEndo = currentRows.some(r => r.endorsed !== undefined && r.endorsed !== null);
     const header = (withOrder ? ['#'] : [])
       .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [],
-        withColl ? ['From collection'] : [], ['Status','Source','Source URL']);
+        withColl ? ['From collection'] : [], withEndo ? ['Endorsed'] : [],
+        ['Status','Source','Source URL']);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
       const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
@@ -1242,6 +1364,7 @@
         .concat([r.name, r.version],
           withSize ? [formatSize(r.size), typeof r.size === 'number' ? r.size : ''] : [],
           withColl ? [r.collectionText || ''] : [],
+          withEndo ? [endorsementLabel(r.endorsed)] : [],
           [status, r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
