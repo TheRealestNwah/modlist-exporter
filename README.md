@@ -42,6 +42,8 @@ browser, with exports available as CSV, plain text, or clipboard copy.
   them: added, removed, enabled/disabled, version bumps, and priority moves
 - Export as CSV, plain `.txt`, or copy straight to clipboard (the changes
   view exports too, as `*-changes.csv` / `*-changes.txt`)
+- **All-games export** — every Vortex game in one CSV with a `Game` column,
+  for when you want the whole setup rather than one game at a time
 
 ## Structure
 
@@ -207,6 +209,26 @@ neither has a usable md5, and a mod belonging to two collections lists both.
 Collections are never listed as members of themselves. Membership is
 deliberately **not** compared in the changes view — a mod's collection rarely
 changes, and matching noise there would be worse than the signal.
+
+## Exporting every game at once
+
+The **All games CSV** button appears when a Vortex file contains more than one
+game. It writes one row per mod across every game, with a `Game` column, fixed
+columns so the sheet stays rectangular, and both the formatted size and the raw
+byte count.
+
+Deliberately one flat sheet rather than a tab per game: a `Game` column can be
+filtered, sorted and pivoted in any spreadsheet app, which answers "what's my
+largest mod across everything" or "how much disk per game" directly. Separate
+tabs can't do that without extra work, and a real multi-sheet `.xlsx` would
+mean either a ~900KB library inlined into this file or a CDN script — and the
+page currently makes no network requests at all, which is rather the point.
+
+Enabled state lives on the profile, so each game uses its most recently
+activated one; a game with no profile at all falls back to its full installed
+list, where status reads as unknown. The search, enabled-only and
+not-yet-endorsed filters all apply per game, so the export matches what you'd
+see stepping through each game in turn.
 
 ## Endorsement
 
