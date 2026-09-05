@@ -19,7 +19,9 @@ browser, with exports available as CSV, plain text, or clipboard copy.
 - **Supports two mod managers:**
   - **Vortex** — auto-detects games and profiles from the state file; shows
     version, enabled/disabled status per profile, and a Nexus source link
-    where available
+    where available. Installed Nexus **collections** are labelled as such and
+    link to the collection page, instead of appearing as ordinary mods with
+    nothing to click
   - **Mod Organizer 2** — reads `modlist.txt` directly; shows mod name,
     enabled/disabled status, and the mod's position in MO2's priority pane,
     with an optional sort by that order (MO2's format doesn't store version

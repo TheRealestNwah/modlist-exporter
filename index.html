@@ -660,21 +660,31 @@
       const version = attr.version || attr.newestVersion || '—';
       const nexusModId = attr.modId;
       const fileSource = attr.source || '';
+      // A Nexus collection is installed as a mod, but it has no modId -- it
+      // carries collectionSlug instead, and lives at a different URL shape.
+      // Without this it renders as an ordinary nexus mod with nothing to
+      // click, since the mod-page link can't be built.
+      const isCollection = mod.type === 'collection';
       let sourceUrl = null;
-      // gameId and nexusModId come from the state file, so only build a link
-      // when both look like what Nexus URLs actually contain.
-      if (fileSource === 'nexus' && /^[a-z0-9]+$/i.test(String(gameId)) &&
+      let source = fileSource || '—';
+      if (isCollection){
+        const slug = String(attr.collectionSlug || '');
+        const collectionGame = String(attr.downloadGame || gameId || '');
+        if (/^[a-z0-9_-]+$/i.test(slug) && /^[a-z0-9_-]+$/i.test(collectionGame)){
+          sourceUrl = 'https://www.nexusmods.com/games/' + collectionGame + '/collections/' + slug;
+        }
+        source = 'collection';
+      } else if (fileSource === 'nexus' && /^[a-z0-9]+$/i.test(String(gameId)) &&
           /^[0-9]+$/.test(String(nexusModId))){
+        // gameId and nexusModId come from the state file, so only build a link
+        // when both look like what Nexus URLs actually contain.
         sourceUrl = 'https://www.nexusmods.com/' + gameId + '/mods/' + nexusModId;
       }
       let enabled = null;
       if (modState){
         enabled = !!(modState[modId] && modState[modId].enabled);
       }
-      return {
-        modId, name, version,
-        enabled, sourceUrl, source: fileSource || '—'
-      };
+      return { modId, name, version, enabled, sourceUrl, source };
     });
 
     rows.sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
