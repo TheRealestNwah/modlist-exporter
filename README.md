@@ -82,7 +82,9 @@ In both cases:
   `JSON.parse` entirely in-browser.
 - The browser's `File.lastModified` timestamp is checked against the current
   time to warn if the snapshot looks stale.
-- Results render into a sortable table with CSV / .txt / clipboard export.
+- Results render into a table with CSV / .txt / clipboard export. MO2 files
+  can additionally be sorted by priority order; Vortex files have no
+  comparable ordering, so that control is hidden for them.
 - Mod names come from mod authors, so they're treated as untrusted: table
   cells are built as DOM text nodes rather than HTML, Nexus links are only
   constructed when the game and mod IDs actually look like IDs, and CSV
