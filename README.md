@@ -39,6 +39,7 @@ This is a single self-contained file — no build step, no dependencies to
 install.
 
 - `index.html` — everything (markup, CSS, JS) lives in this one file.
+- `test/` — tests. Development only; nothing here is needed to use the tool.
 
 ## Running it
 
@@ -48,6 +49,35 @@ Just double-click `index.html`, or serve it locally:
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
+
+## Tests
+
+```bash
+node --test test/*.test.js
+```
+
+No dependencies and no build step. Because `index.html` is deliberately one
+self-contained file with nothing to import, `test/extract.js` lifts the pure
+(DOM-free) functions out of its `<script>` block and evaluates them:
+`parseMO2`, `parseModlist`, `buildRows`, `diffRows`, `statusLabel` and
+`csvCell`.
+
+That couples the tests to the file's shape — each of those must stay declared
+at two-space indentation inside the IIFE. If one is renamed or re-indented,
+extraction fails loudly by name rather than silently testing nothing.
+
+The suite covers marker parsing, separator handling, MO2's reversed priority
+order, the Vortex attribute fallbacks, Nexus mod and collection link
+construction (including rejecting a malformed slug), the tri-state
+enabled/unknown status, every diff classification, and the CSV
+formula-injection guard.
+
+One test is skipped unless you have local Vortex backups: if
+`%APPDATA%\Vortex\temp\state_backups_full\` holds two or more state files, it
+parses and diffs them as a real-world check. Nothing from those files is
+committed.
+
+Tests run in CI on every pull request into `main`.
 
 ## Releasing
 
