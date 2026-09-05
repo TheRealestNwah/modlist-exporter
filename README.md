@@ -8,7 +8,7 @@ browser, with exports available as CSV, plain text, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-![The mod list view: a Skyrim Special Edition profile showing search and sort controls, per-mod install sizes with a disk total, which collection each mod came from, enabled status and Nexus links](docs/screenshot.png)
+![The mod list view: a Skyrim Special Edition profile showing search and sort controls, per-mod install sizes with a disk total, collection membership, endorsement status, enabled state and Nexus links](docs/screenshot.png)
 
 <sub>Example data — not a real load order.</sub>
 
@@ -27,8 +27,10 @@ browser, with exports available as CSV, plain text, or clipboard copy.
     with an optional sort by that order (MO2's format doesn't store version
     or source data)
 - **Collection membership** — shows which installed mods came from which
-  Nexus collection, and whether the collection required or merely recommended
-  them
+  Nexus collection, whether the collection required or merely recommended
+  them, and which of a collection's mods you don't have installed
+- **Endorsement status** — see at a glance which mods you've endorsed on
+  Nexus, with a filter for the ones you haven't got round to
 - **Search and sort** — filter the list by name, mod ID, version or source;
   sort by name, install size, or MO2 priority order
 - **Install size** — per-mod size and a total for whatever is currently shown,
@@ -194,12 +196,28 @@ Against the 436 real mods and 52 collection rules this was developed with,
 member isn't installed, which is entirely normal for a `recommends` you
 declined — it isn't an error and nothing is reported for it.
 
+Mods a collection lists that you don't have installed are reported in a note
+below the table, rather than being dropped silently. That is what the
+unmatched rules mean — often a recommendation you declined — and it's more
+useful shown than hidden.
+
 Practical consequences: a mod is only attributed if it's actually installed,
 attribution can in principle be wrong if two different mods share a name and
 neither has a usable md5, and a mod belonging to two collections lists both.
 Collections are never listed as members of themselves. Membership is
 deliberately **not** compared in the changes view — a mod's collection rarely
 changes, and matching noise there would be worse than the signal.
+
+## Endorsement
+
+Vortex records whether you've endorsed each mod on Nexus. The tool surfaces
+that as a column, and the **Not yet endorsed** filter narrows the list to the
+ones still waiting on you — which for a large setup is usually most of them.
+
+"Not yet" means Vortex has the mod as *Undecided*. Deliberately excluded:
+*Abstained*, because that's a decision you already made, and mods with no
+endorsement state at all, which are the ones that didn't come from Nexus and
+can't be endorsed.
 
 ## Comparing two snapshots
 

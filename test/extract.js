@@ -23,9 +23,14 @@ const NAMES = [
   'csvCell',
   'formatSize',
   'matchesQuery',
+  'indexModsForMatching',
+  'matchRule',
   'collectionMembership',
   'collectionLabel',
   'viewState',
+  'missingCollectionMembers',
+  'endorsementLabel',
+  'isUnendorsed',
 ];
 
 function extract() {

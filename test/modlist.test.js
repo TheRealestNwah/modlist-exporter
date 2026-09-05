@@ -6,7 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
-        collectionMembership, collectionLabel, viewState } = require('./extract.js');
+        collectionMembership, collectionLabel, viewState,
+        missingCollectionMembers, endorsementLabel, isUnendorsed } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -505,6 +506,96 @@ test('viewState: tolerates an empty or missing row set', () => {
     assert.deepStrictEqual(v.rows, []);
     assert.strictEqual(v.totalBytes, 0);
   }
+});
+
+// ------------------------------------------------ missing collection members
+
+test('missingCollectionMembers: reports a rule nothing installed satisfies', () => {
+  const m = missingCollectionMembers({
+    c: coll([requires({ description: 'Absent Mod' })]),
+  });
+  assert.deepStrictEqual(m, [{ name: 'Absent Mod', collection: 'My Collection', optional: false }]);
+});
+
+test('missingCollectionMembers: says nothing about members that ARE installed', () => {
+  const m = missingCollectionMembers({
+    c: coll([requires({ fileMD5: 'here' })]),
+    installed: { attributes: { name: 'Here', fileMD5: 'here' } },
+  });
+  assert.deepStrictEqual(m, []);
+});
+
+test('missingCollectionMembers: marks recommendations as optional', () => {
+  const m = missingCollectionMembers({ c: coll([recommends({ description: 'Nice To Have' })]) });
+  assert.strictEqual(m[0].optional, true);
+});
+
+test('missingCollectionMembers: falls back to logicalFileName for a name', () => {
+  const m = missingCollectionMembers({ c: coll([requires({ logicalFileName: 'SomePlugin' })]) });
+  assert.strictEqual(m[0].name, 'SomePlugin');
+});
+
+test('missingCollectionMembers: a rule with no usable name is skipped', () => {
+  // Nothing useful could be shown for it, so reporting it would just confuse.
+  assert.deepStrictEqual(missingCollectionMembers({ c: coll([requires({ fileMD5: 'x' })]) }), []);
+});
+
+test('missingCollectionMembers: the same absent mod is not listed twice per collection', () => {
+  const m = missingCollectionMembers({
+    c: coll([requires({ description: 'Absent' }), requires({ description: 'Absent' })]),
+  });
+  assert.strictEqual(m.length, 1);
+});
+
+test('missingCollectionMembers: no collections means nothing missing', () => {
+  assert.deepStrictEqual(missingCollectionMembers({ a: { attributes: { name: 'A' } } }), []);
+});
+
+// ------------------------------------------------------------- endorsement
+
+test('endorsementLabel: maps every state Vortex records', () => {
+  assert.strictEqual(endorsementLabel('Endorsed'), 'yes');
+  assert.strictEqual(endorsementLabel('Undecided'), 'not yet');
+  assert.strictEqual(endorsementLabel('pending'), 'not yet');
+  assert.strictEqual(endorsementLabel('Abstained'), 'abstained');
+  assert.strictEqual(endorsementLabel(undefined), '—');
+  assert.strictEqual(endorsementLabel(null), '—');
+});
+
+test('isUnendorsed: only genuinely undecided counts', () => {
+  // Abstained is a decision, and an absent value means the mod can't be
+  // endorsed at all -- neither belongs on a "you should endorse these" list.
+  assert.strictEqual(isUnendorsed('Undecided'), true);
+  assert.strictEqual(isUnendorsed('pending'), true);
+  assert.strictEqual(isUnendorsed('Endorsed'), false);
+  assert.strictEqual(isUnendorsed('Abstained'), false);
+  assert.strictEqual(isUnendorsed(undefined), false);
+});
+
+test('buildRows: carries the endorsement state through', () => {
+  const rows = buildRows(vortex({
+    a: { attributes: { name: 'A', endorsed: 'Endorsed' } },
+    b: { attributes: { name: 'B' } },
+  }), 'skyrimse', '__all__');
+  const by = Object.fromEntries(rows.map((r) => [r.name, r.endorsed]));
+  assert.strictEqual(by.A, 'Endorsed');
+  assert.strictEqual(by.B, undefined);
+});
+
+test('viewState: the not-endorsed filter keeps only undecided mods', () => {
+  const rows = [
+    V('Done', { endorsed: 'Endorsed' }),
+    V('Todo', { endorsed: 'Undecided' }),
+    V('No', { endorsed: 'Abstained' }),
+    V('NA'),
+  ];
+  const v = viewState(rows, { notEndorsedOnly: true });
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['Todo']);
+});
+
+test('viewState: hasEndo reflects whether any endorsement data exists', () => {
+  assert.strictEqual(viewState([V('A', { endorsed: 'Undecided' })], {}).hasEndo, true);
+  assert.strictEqual(viewState([V('A')], {}).hasEndo, false);
 });
 
 // -------------------------------------------------- optional: real backups
