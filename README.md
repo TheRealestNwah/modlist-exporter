@@ -20,9 +20,10 @@ browser, with exports available as CSV, plain text, or clipboard copy.
   - **Vortex** — auto-detects games and profiles from the state file; shows
     version, enabled/disabled status per profile, and a Nexus source link
     where available
-  - **Mod Organizer 2** — reads `modlist.txt` directly; shows mod name and
-    enabled/disabled status (MO2's format doesn't store version or source
-    data)
+  - **Mod Organizer 2** — reads `modlist.txt` directly; shows mod name,
+    enabled/disabled status, and the mod's position in MO2's priority pane,
+    with an optional sort by that order (MO2's format doesn't store version
+    or source data)
 - **File freshness check** — flags when the loaded file is more than a
   couple days old, so you don't export a stale list without realizing it
 - Export as CSV, plain `.txt`, or copy straight to clipboard
@@ -58,8 +59,8 @@ extension:
   unmanaged base-game/DLC content), and the rest of the line is the mod
   name. Comment lines (`#`) and blanks are skipped, and MO2's
   `*_separator` entries are dropped so they don't pollute the list or the
-  count. Each entry's position in the file is recorded but deliberately not
-  interpreted yet — see the load-order note under Roadmap.
+  count. Each entry's file position is recorded and then reversed to
+  recover MO2's pane order — see "Priority order in modlist.txt" below.
 
 In both cases:
 - Nothing is ever uploaded anywhere — parsing happens with `FileReader` +
@@ -119,19 +120,34 @@ part of this format, so those columns will show as empty for MO2 files.
 Exports are named after the detected format (`vortex-modlist.csv` /
 `mo2-modlist.csv`, and likewise for `.txt`).
 
-**Unverified:** `modlist.txt` line order is widely assumed to reflect mod
-priority, but the direction (top-to-bottom vs. reversed) has not been
-confirmed against a real profile. The parser preserves each entry's file
-position so this can be tested later, but nothing in the UI presents it as
-load order until that's settled.
+#### Priority order in modlist.txt
+
+`modlist.txt` is written in **reverse** of the order MO2 shows in its left
+pane. The first line of the file is the *bottom* of the pane, and the last
+line is the top. Because mods lower in MO2's pane win file conflicts, that
+means **line 1 is the highest priority and the last line is priority 0** —
+the opposite of the intuitive reading.
+
+This was verified against a real profile on 2026-09-05 rather than assumed.
+Two things confirmed it: `ModOrganizer.ini` records the pane's display order
+in `MainWindow_modList_index`, ending with the `Overwrite` entry that MO2
+always pins to the bottom of the pane, and that order is the exact reverse
+of the file. The pane's top row was then checked directly in MO2.
+
+The `#` column and the "MO2 priority order" sort both reverse the file to
+match what you see in MO2, numbering from 1 at the top of the pane.
+Separators occupy a slot in that ordering (as they do in MO2) but are not
+themselves listed. The column is hidden for Vortex files, which carry no
+comparable ordering.
 
 ## Roadmap / ideas
 
 - [x] Warn when the loaded file looks stale
 - [x] Support Mod Organizer 2's modlist export format alongside Vortex's JSON
-- [ ] Surface load order when present in the state file (game-extension
-      dependent for Vortex; MO2's modlist.txt order reflects priority but
-      needs verification before relying on it)
+- [x] Surface MO2's priority order (verified: the file is stored reversed
+      relative to MO2's pane)
+- [ ] Surface Vortex load order when present in the state file
+      (game-extension dependent)
 - [ ] Diff view between two loaded snapshots (what was added/removed/updated)
 - [ ] Folder-watch / auto-refresh via the File System Access API
 
