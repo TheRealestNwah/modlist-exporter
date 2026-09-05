@@ -8,9 +8,9 @@ browser, with exports available as CSV, plain text, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-<!-- Add a screenshot or short GIF here once you have one, e.g.:
-![screenshot](docs/screenshot.png)
--->
+![The mod list view: a Skyrim Special Edition profile with versions, enabled status, Nexus links and an installed collection](docs/screenshot.png)
+
+<sub>Example data — not a real load order.</sub>
 
 ## Features
 
