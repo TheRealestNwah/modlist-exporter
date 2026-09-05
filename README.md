@@ -6,8 +6,7 @@ Browse and export your installed mods from your mod manager. Currently
 supports Vortex, with more mod managers planned. Runs entirely in your
 browser, with exports available as CSV, plain text, or clipboard copy.
 
-**[Live demo](https://<your-username>.github.io/modlist-exporter/)** — update this
-link once GitHub Pages is enabled (Settings → Pages → Source: GitHub Actions).
+**[Live demo](https://therealestnwah.github.io/modlist-exporter/)
 
 <!-- Add a screenshot or short GIF here once you have one, e.g.:
 ![screenshot](docs/screenshot.png)
