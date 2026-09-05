@@ -199,6 +199,44 @@
   }
   .badge.on{ background: rgba(95,214,138,0.15); color: var(--good); }
   .badge.off{ background: rgba(255,107,107,0.12); color: var(--bad); }
+  .badge.added{ background: rgba(95,214,138,0.15); color: var(--good); }
+  .badge.removed{ background: rgba(255,107,107,0.12); color: var(--bad); }
+  .badge.changed{ background: rgba(143,107,255,0.18); color: #b79bff; }
+  .badge.unchanged{ background: var(--panel-2); color: var(--ink-dim); }
+
+  /* --- comparison --- */
+  .compare-wrap{ display:none; margin-top: 26px; }
+  .compare-wrap.show{ display:block; }
+  .compare-wrap .dropzone{ margin-top: 10px; padding: 22px 20px; }
+  .compare-lead{ font-size: 13px; color: var(--ink-dim); }
+  .view-tabs{ display:none; gap: 8px; margin-top: 22px; }
+  .view-tabs.show{ display:flex; }
+  .view-tabs button{
+    background: var(--panel-2);
+    color: var(--ink-dim);
+    border: 1px solid var(--line);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-family: var(--sans);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  .view-tabs button.active{ background: var(--accent-dim); color: var(--ink); border-color: var(--accent-dim); }
+  .diff-basis{
+    display:none;
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+  }
+  .diff-basis.show{ display:block; }
+  .chg{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
+  .chg .from{ color: var(--ink-dim); }
+  .chg .to{ color: var(--ink); }
+  #diffTable{ display:none; }
+  #diffTable.show{ display:table; }
   .ver, .src, .ord{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
   .ord{ text-align: right; width: 1%; white-space: nowrap; padding-right: 14px; }
   /* Only MO2 files carry a verified order, so the column is hidden otherwise. */
@@ -276,8 +314,15 @@
     </div>
   </div>
 
+  <div class="view-tabs" id="viewTabs">
+    <button id="viewListBtn" class="active">Mod list</button>
+    <button id="viewDiffBtn">Changes</button>
+  </div>
+
+  <div class="diff-basis" id="diffBasis"></div>
+
   <div class="summary-bar" id="summaryBar">
-    <div class="count"><strong id="modCount">0</strong> mods</div>
+    <div class="count"><strong id="modCount">0</strong> <span id="countLabel">mods</span></div>
     <div class="export-btns">
       <button id="copyBtn">Copy as text</button>
       <button id="csvBtn">Download CSV</button>
@@ -298,7 +343,28 @@
     <tbody id="modTableBody"></tbody>
   </table>
 
+  <table id="diffTable">
+    <thead>
+      <tr>
+        <th>Change</th>
+        <th>Mod</th>
+        <th>What changed</th>
+      </tr>
+    </thead>
+    <tbody id="diffTableBody"></tbody>
+  </table>
+
   <div class="empty-note" id="emptyNote">No mods match the current filter.</div>
+
+  <div class="compare-wrap" id="compareWrap">
+    <div class="compare-lead">Compare against a second file to see what changed between them — added, removed, enabled/disabled, and version bumps.</div>
+    <div class="dropzone" id="compareZone">
+      <div class="dz-title">Click to choose a file to compare, or drag one here</div>
+      <div class="dz-sub">an older or newer snapshot from the same mod manager</div>
+      <input type="file" id="compareInput" accept=".json,application/json,.txt,text/plain">
+    </div>
+    <div class="status" id="compareStatus"></div>
+  </div>
 </div>
 
 <script>
@@ -321,9 +387,25 @@
   const txtBtn = document.getElementById('txtBtn');
   const sortSelect = document.getElementById('sortSelect');
   const sortField = document.getElementById('sortField');
+  const compareWrap = document.getElementById('compareWrap');
+  const compareZone = document.getElementById('compareZone');
+  const compareInput = document.getElementById('compareInput');
+  const compareStatus = document.getElementById('compareStatus');
+  const viewTabs = document.getElementById('viewTabs');
+  const viewListBtn = document.getElementById('viewListBtn');
+  const viewDiffBtn = document.getElementById('viewDiffBtn');
+  const diffBasis = document.getElementById('diffBasis');
+  const diffTable = document.getElementById('diffTable');
+  const diffTableBody = document.getElementById('diffTableBody');
+  const countLabel = document.getElementById('countLabel');
 
   let parsed = null; // { type: 'vortex', mods, profiles } | { type: 'mo2', entries: [{name, enabled}] }
   let currentRows = [];
+  let primaryFile = null;   // the File behind `parsed`, kept for its timestamp
+  let compareSource = null; // second parsed file, same shape as `parsed`
+  let compareFile = null;
+  let currentDiff = [];
+  let view = 'list';        // 'list' | 'diff'
 
   dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
@@ -391,54 +473,97 @@
     return entries;
   }
 
+  // Turns a file's text into a source object, or an explanatory error.
+  // Shared by the primary slot and the comparison slot.
+  function parseModlist(text){
+    let json = null;
+    let jsonError = null;
+    try{ json = JSON.parse(text); }catch(err){ jsonError = err; }
+
+    if (json !== null){
+      const root = json.persistent ? json.persistent : json; // some backups are stored unwrapped
+      const mods = root && root.mods;
+      const profiles = root && root.profiles;
+      if (!mods || typeof mods !== 'object' || Object.keys(mods).length === 0){
+        const topKeys = json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : '(not an object)';
+        return { error: 'No mods found in this file. Top-level keys it does contain: ' + topKeys + '. This is probably the wrong file — the full mod list lives in AppData\\Roaming\\Vortex\\temp\\state_backups_full\\, not the root Vortex folder.' };
+      }
+      return { source: { type: 'vortex', mods, profiles: profiles || {} } };
+    }
+
+    const entries = parseMO2(text);
+    if (entries.length === 0){
+      // A file that starts like JSON but won't parse is almost always a
+      // truncated or half-written Vortex backup rather than the wrong file
+      // — worth saying so, since Vortex's scheduler is known to misbehave.
+      const looksLikeJson = /^[\s\uFEFF]*[{[]/.test(text);
+      if (looksLikeJson){
+        return { error: 'This looks like a Vortex state file, but it isn\'t valid JSON — it\'s most likely truncated or was written while Vortex was mid-save. Error: ' + (jsonError && jsonError.message ? jsonError.message : 'unknown') + '. Try another file in state_backups_full\\, or trigger a fresh manual backup in Vortex (Settings → Workarounds).' };
+      }
+      return { error: 'Couldn\'t recognize this file as either a Vortex state file (invalid JSON) or an MO2 modlist.txt (no lines starting with +, - or *). Double check you picked the right file — see "Where do I find the file?" above.' };
+    }
+    return { source: { type: 'mo2', entries } };
+  }
+
+  const STALE_NOTE = {
+    vortex: 'If you\'ve installed or changed mods since then, this list won\'t reflect it — see "Where do I find the file?" above, or trigger a manual backup in Vortex (Settings → Workarounds) for a fresh one.',
+    mo2: 'MO2\'s modlist.txt updates live as you change mods, so a stale file usually means you copied it somewhere instead of loading it from the profile folder directly.'
+  };
+
+  function readFile(file, onText, onError){
+    const reader = new FileReader();
+    reader.onload = e => onText(e.target.result);
+    reader.onerror = () => onError('Could not read that file.');
+    reader.readAsText(file);
+  }
+
+  function setCompareStatus(msg, cls){
+    compareStatus.textContent = msg;
+    compareStatus.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
   function handleFile(file){
     setStatus('Reading ' + file.name + ' …');
     freshnessEl.classList.remove('show');
-    const reader = new FileReader();
-    reader.onload = e => {
-      const text = e.target.result;
-      let json = null;
-      let jsonError = null;
-      try{ json = JSON.parse(text); }catch(err){ jsonError = err; }
+    readFile(file, text => {
+      const res = parseModlist(text);
+      if (res.error){ setStatus(res.error, 'err'); return; }
 
-      if (json !== null){
-        // --- Vortex JSON path ---
-        const root = json.persistent ? json.persistent : json; // some backups are stored unwrapped
-        const mods = root && root.mods;
-        const profiles = root && root.profiles;
-        if (!mods || typeof mods !== 'object' || Object.keys(mods).length === 0){
-          const topKeys = json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : '(not an object)';
-          setStatus('No mods found in this file. Top-level keys it does contain: ' + topKeys + '. This is probably the wrong file — the full mod list lives in AppData\\Roaming\\Vortex\\temp\\state_backups_full\\, not the root Vortex folder.', 'err');
-          return;
-        }
-        parsed = { type: 'vortex', mods, profiles: profiles || {} };
-        setStatus('Loaded ' + file.name + ' ✓', 'ok');
-        showFreshness(file, 'If you\'ve installed or changed mods since then, this list won\'t reflect it — see "Where do I find the file?" above, or trigger a manual backup in Vortex (Settings → Workarounds) for a fresh one.');
-        populateGames();
-        return;
-      }
+      // A new primary file invalidates any comparison against the old one.
+      compareSource = null;
+      compareFile = null;
+      currentDiff = [];
+      setCompareStatus('');
+      viewTabs.classList.remove('show');
+      view = 'list';
 
-      // --- Not JSON: try MO2 modlist.txt ---
-      const entries = parseMO2(text);
-      if (entries.length === 0){
-        // A file that starts like JSON but won't parse is almost always a
-        // truncated or half-written Vortex backup rather than the wrong file
-        // — worth saying so, since Vortex's scheduler is known to misbehave.
-        const looksLikeJson = /^[\s\uFEFF]*[{[]/.test(text);
-        if (looksLikeJson){
-          setStatus('This looks like a Vortex state file, but it isn\'t valid JSON — it\'s most likely truncated or was written while Vortex was mid-save. Error: ' + (jsonError && jsonError.message ? jsonError.message : 'unknown') + '. Try another file in state_backups_full\\, or trigger a fresh manual backup in Vortex (Settings → Workarounds).', 'err');
-        } else {
-          setStatus('Couldn\'t recognize this file as either a Vortex state file (invalid JSON) or an MO2 modlist.txt (no lines starting with +, - or *). Double check you picked the right file — see "Where do I find the file?" above.', 'err');
-        }
-        return;
-      }
-      parsed = { type: 'mo2', entries };
+      parsed = res.source;
+      primaryFile = file;
       setStatus('Loaded ' + file.name + ' ✓', 'ok');
-      showFreshness(file, 'MO2\'s modlist.txt updates live as you change mods, so a stale file usually means you copied it somewhere instead of loading it from the profile folder directly.');
-      populateMO2();
-    };
-    reader.onerror = () => setStatus('Could not read that file.', 'err');
-    reader.readAsText(file);
+      showFreshness(file, STALE_NOTE[parsed.type]);
+      if (parsed.type === 'mo2') populateMO2(); else populateGames();
+      compareWrap.classList.add('show');
+    }, msg => setStatus(msg, 'err'));
+  }
+
+  function handleCompareFile(file){
+    if (!parsed) return;
+    setCompareStatus('Reading ' + file.name + ' …');
+    readFile(file, text => {
+      const res = parseModlist(text);
+      if (res.error){ setCompareStatus(res.error, 'err'); return; }
+      if (res.source.type !== parsed.type){
+        const label = t => t === 'mo2' ? 'Mod Organizer 2' : 'Vortex';
+        setCompareStatus('That\'s a ' + label(res.source.type) + ' file, but the first one is ' +
+          label(parsed.type) + '. Comparing only makes sense between two files from the same mod manager.', 'err');
+        return;
+      }
+      compareSource = res.source;
+      compareFile = file;
+      setCompareStatus('Comparing against ' + file.name + ' ✓', 'ok');
+      viewTabs.classList.add('show');
+      setView('diff');
+    }, msg => setCompareStatus(msg, 'err'));
   }
 
   function populateGames(){
@@ -486,8 +611,8 @@
     if (allProfiles.length){
       profileSelect.value = allProfiles.sort((a,b) => (b[1].lastActivated||0) - (a[1].lastActivated||0))[0][0];
     }
-    profileSelect.onchange = render;
-    render();
+    profileSelect.onchange = refresh;
+    refresh();
   }
 
   // Builds the row set for one loaded file. Parameterised on the source so
@@ -620,8 +745,156 @@
     currentRows = rows;
   }
 
-  onlyEnabled.addEventListener('change', render);
-  sortSelect.addEventListener('change', render);
+  // A profile present in one file may not exist in the other; fall back to
+  // the unfiltered list rather than silently showing nothing.
+  function profileKeyIn(source, key){
+    if (!key || key === '__all__') return '__all__';
+    return (source.profiles && source.profiles[key]) ? key : '__all__';
+  }
+
+  function fmtDate(file){
+    return new Date(file.lastModified).toLocaleString();
+  }
+
+  function renderDiff(){
+    if (!parsed || !compareSource || !primaryFile || !compareFile) return;
+    const gameId = gameSelect.value;
+    // Normalise both sides through the same fallback, so an MO2 file (which
+    // has no profile selection at all) doesn't read as a mismatch.
+    const keyPrimary = profileKeyIn(parsed, profileSelect.value);
+    const keyCompare = profileKeyIn(compareSource, profileSelect.value);
+
+    const rowsPrimary = buildRows(parsed, gameId, keyPrimary);
+    const rowsCompare = buildRows(compareSource, gameId, keyCompare);
+
+    // Order by file timestamp so 'added' always means added over time,
+    // regardless of which file the user happened to load first.
+    const primaryIsOlder = primaryFile.lastModified <= compareFile.lastModified;
+    const olderRows = primaryIsOlder ? rowsPrimary : rowsCompare;
+    const newerRows = primaryIsOlder ? rowsCompare : rowsPrimary;
+    const olderFile = primaryIsOlder ? primaryFile : compareFile;
+    const newerFile = primaryIsOlder ? compareFile : primaryFile;
+
+    currentDiff = diffRows(olderRows, newerRows);
+    const counts = { added:0, removed:0, changed:0, unchanged:0 };
+    currentDiff.forEach(d => counts[d.change]++);
+    const shown = currentDiff.filter(d => d.change !== 'unchanged');
+
+    diffTableBody.innerHTML = '';
+    shown.forEach(d => {
+      const tr = document.createElement('tr');
+
+      const chgTd = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + d.change;
+      badge.textContent = d.change;
+      chgTd.appendChild(badge);
+      tr.appendChild(chgTd);
+
+      const nameTd = document.createElement('td');
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'mod-name';
+      nameDiv.textContent = d.row.name;
+      nameTd.appendChild(nameDiv);
+      tr.appendChild(nameTd);
+
+      const detTd = document.createElement('td');
+      detTd.className = 'chg';
+      if (d.change === 'changed'){
+        d.changes.forEach((c, i) => {
+          if (i) detTd.appendChild(document.createTextNode('  ·  '));
+          detTd.appendChild(document.createTextNode(c.field + ' '));
+          const from = document.createElement('span');
+          from.className = 'from';
+          from.textContent = String(c.from);
+          detTd.appendChild(from);
+          detTd.appendChild(document.createTextNode(' → '));
+          const to = document.createElement('span');
+          to.className = 'to';
+          to.textContent = String(c.to);
+          detTd.appendChild(to);
+        });
+      } else {
+        const bits = [];
+        if (d.row.version && d.row.version !== '—') bits.push('v' + d.row.version);
+        bits.push(statusLabel(d.row.enabled));
+        detTd.textContent = bits.join('  ·  ');
+      }
+      tr.appendChild(detTd);
+
+      diffTableBody.appendChild(tr);
+    });
+
+    // Basis line: which direction, and what was left out.
+    diffBasis.textContent = '';
+    const lines = [
+      'Comparing ' + olderFile.name + ' (' + fmtDate(olderFile) + ')  →  ' +
+        newerFile.name + ' (' + fmtDate(newerFile) + ')',
+      counts.added + ' added  ·  ' + counts.removed + ' removed  ·  ' +
+        counts.changed + ' changed  ·  ' + counts.unchanged + ' unchanged (not listed)'
+    ];
+    if (parsed.type === 'vortex' && keyCompare !== keyPrimary){
+      const pname = (parsed.profiles && parsed.profiles[keyPrimary] &&
+        parsed.profiles[keyPrimary].name) || keyPrimary;
+      lines.push('Note: profile "' + pname + '" does not exist in the other file, so that ' +
+        'side was compared against all its installed mods. Enabled/disabled state ' +
+        'can\'t be compared across that gap, so only additions, removals and version ' +
+        'changes are shown.');
+    }
+    lines.forEach((t, i) => {
+      if (i) diffBasis.appendChild(document.createElement('br'));
+      diffBasis.appendChild(document.createTextNode(t));
+    });
+    diffBasis.classList.add('show');
+
+    modCount.textContent = shown.length;
+    countLabel.textContent = shown.length === 1 ? 'change' : 'changes';
+    diffTable.classList.toggle('show', shown.length > 0);
+    emptyNote.classList.toggle('show', shown.length === 0);
+    summaryBar.classList.add('show');
+  }
+
+  function setView(v){
+    view = v;
+    const isDiff = v === 'diff';
+    viewListBtn.classList.toggle('active', !isDiff);
+    viewDiffBtn.classList.toggle('active', isDiff);
+    if (isDiff){
+      table.classList.remove('show');
+      controls.classList.remove('show');
+      emptyNote.textContent = 'No differences between these two files.';
+      renderDiff();
+    } else {
+      diffTable.classList.remove('show');
+      diffBasis.classList.remove('show');
+      controls.classList.add('show');
+      countLabel.textContent = 'mods';
+      emptyNote.textContent = 'No mods match the current filter.';
+      render();
+    }
+  }
+
+  // Route re-renders through the active view.
+  function refresh(){
+    if (view === 'diff') renderDiff(); else render();
+  }
+
+  onlyEnabled.addEventListener('change', refresh);
+  sortSelect.addEventListener('change', refresh);
+  viewListBtn.addEventListener('click', () => setView('list'));
+  viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
+
+  compareZone.addEventListener('click', () => compareInput.click());
+  compareZone.addEventListener('dragover', e => { e.preventDefault(); compareZone.classList.add('drag'); });
+  compareZone.addEventListener('dragleave', () => compareZone.classList.remove('drag'));
+  compareZone.addEventListener('drop', e => {
+    e.preventDefault();
+    compareZone.classList.remove('drag');
+    if (e.dataTransfer.files.length) handleCompareFile(e.dataTransfer.files[0]);
+  });
+  compareInput.addEventListener('change', e => {
+    if (e.target.files.length) handleCompareFile(e.target.files[0]);
+  });
 
   function exportBaseName(){
     return (parsed && parsed.type === 'mo2') ? 'mo2-modlist' : 'vortex-modlist';
@@ -664,7 +937,12 @@
       if (was.version !== now.version){
         changes.push({ field: 'version', from: was.version, to: now.version });
       }
-      if (was.enabled !== now.enabled){
+      // Only a real enabled -> disabled flip counts. If either side's status is
+      // unknown (null, which is what Vortex's "all installed mods" view gives),
+      // that's missing information, not a change -- reporting it would mark
+      // every single mod as changed.
+      if (typeof was.enabled === 'boolean' && typeof now.enabled === 'boolean' &&
+          was.enabled !== now.enabled){
         changes.push({ field: 'status', from: statusLabel(was.enabled), to: statusLabel(now.enabled) });
       }
       if (typeof was.order === 'number' && typeof now.order === 'number' && was.order !== now.order){
@@ -688,7 +966,17 @@
     return currentRows.some(r => typeof r.order === 'number');
   }
 
+  function diffTextLines(){
+    return currentDiff.filter(d => d.change !== 'unchanged').map(d => {
+      const detail = d.change === 'changed'
+        ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ')
+        : statusLabel(d.row.enabled);
+      return '[' + d.change + '] ' + d.row.name + ' — ' + detail;
+    });
+  }
+
   function textLines(){
+    if (view === 'diff') return diffTextLines();
     const withOrder = exportHasOrder();
     return currentRows.map(r => {
       const status = r.enabled === null ? '' : (r.enabled ? ' [enabled]' : ' [disabled]');
@@ -698,6 +986,18 @@
   }
 
   csvBtn.addEventListener('click', () => {
+    if (view === 'diff'){
+      const lines = ['Change,Mod,Version,Status,Detail'];
+      currentDiff.filter(d => d.change !== 'unchanged').forEach(d => {
+        const detail = d.change === 'changed'
+          ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ')
+          : '';
+        lines.push([d.change, d.row.name, d.row.version, statusLabel(d.row.enabled), detail]
+          .map(csvCell).join(','));
+      });
+      download(exportBaseName() + '-changes.csv', lines.join('\n'), 'text/csv');
+      return;
+    }
     const withOrder = exportHasOrder();
     const header = (withOrder ? ['#'] : []).concat(['Name','Version','Status','Source','Source URL']);
     const lines = [header.join(',')];
@@ -711,7 +1011,8 @@
   });
 
   txtBtn.addEventListener('click', () => {
-    download(exportBaseName() + '.txt', textLines().join('\n'), 'text/plain');
+    download(exportBaseName() + (view === 'diff' ? '-changes' : '') + '.txt',
+      textLines().join('\n'), 'text/plain');
   });
 
   copyBtn.addEventListener('click', () => {
