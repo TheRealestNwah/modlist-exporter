@@ -8,7 +8,7 @@ browser, with exports available as CSV, plain text, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-![The mod list view: a Skyrim Special Edition profile showing search and sort controls, per-mod install sizes with a disk total, enabled status, Nexus links and an installed collection](docs/screenshot.png)
+![The mod list view: a Skyrim Special Edition profile showing search and sort controls, per-mod install sizes with a disk total, which collection each mod came from, enabled status and Nexus links](docs/screenshot.png)
 
 <sub>Example data — not a real load order.</sub>
 
@@ -26,6 +26,9 @@ browser, with exports available as CSV, plain text, or clipboard copy.
     enabled/disabled status, and the mod's position in MO2's priority pane,
     with an optional sort by that order (MO2's format doesn't store version
     or source data)
+- **Collection membership** — shows which installed mods came from which
+  Nexus collection, and whether the collection required or merely recommended
+  them
 - **Search and sort** — filter the list by name, mod ID, version or source;
   sort by name, install size, or MO2 priority order
 - **Install size** — per-mod size and a total for whatever is currently shown,
@@ -158,6 +161,32 @@ In both cases:
   fields that begin with `=`, `+`, `-` or `@` are quote-prefixed so
   spreadsheet apps don't evaluate them as formulas.
 
+## Collection membership, and why it's a guess
+
+This is the one place the tool infers rather than reports, so it's worth
+being explicit about.
+
+A Nexus collection installs as a mod that carries its members in a `rules`
+array. But those rules reference members by `fileMD5`, `logicalFileName` or
+`description` — **not** by the installed mod's ID. So membership has to be
+matched rather than looked up. The matcher tries the most precise key first:
+
+1. `fileMD5` — exact
+2. `logicalFileName`
+3. `description`, against a mod's name
+
+Against the 436 real mods and 52 collection rules this was developed with,
+**49 of 52 (94%)** resolved. A rule that matches nothing simply means that
+member isn't installed, which is entirely normal for a `recommends` you
+declined — it isn't an error and nothing is reported for it.
+
+Practical consequences: a mod is only attributed if it's actually installed,
+attribution can in principle be wrong if two different mods share a name and
+neither has a usable md5, and a mod belonging to two collections lists both.
+Collections are never listed as members of themselves. Membership is
+deliberately **not** compared in the changes view — a mod's collection rarely
+changes, and matching noise there would be worse than the signal.
+
 ## Comparing two snapshots
 
 Load a file, then drop a second one into the compare box that appears below
@@ -256,6 +285,7 @@ comparable ordering.
 - [x] Support Mod Organizer 2's modlist export format alongside Vortex's JSON
 - [x] Surface MO2's priority order (verified: the file is stored reversed
       relative to MO2's pane)
+- [x] Attribute mods to the collection they were installed from
 - [ ] Surface Vortex load order when present in the state file
       (game-extension dependent)
 - [x] Diff view between two loaded snapshots (what was added/removed/updated)

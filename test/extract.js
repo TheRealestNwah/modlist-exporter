@@ -23,6 +23,8 @@ const NAMES = [
   'csvCell',
   'formatSize',
   'matchesQuery',
+  'collectionMembership',
+  'collectionLabel',
 ];
 
 function extract() {
