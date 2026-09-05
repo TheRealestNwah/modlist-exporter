@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
-        collectionMembership, collectionLabel } = require('./extract.js');
+        collectionMembership, collectionLabel, viewState } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -402,6 +402,109 @@ test('buildRows: attributes members and leaves non-members blank', () => {
 
 test('matchesQuery: searching a collection name finds its members', () => {
   assert.strictEqual(matchesQuery({ name: 'Codeware', collectionText: 'CET+Essentials' }, 'essentials'), true);
+});
+
+// ----------------------------------------------------------------- viewState
+
+// The decision layer render() applies. Both render-layer bugs found during
+// development were decision bugs, so this is where the safety net belongs.
+const V = (modId, extra) => Object.assign(
+  { modId, name: modId, version: '1.0', enabled: true, source: 'nexus' }, extra);
+
+test('viewState: no options shows everything, sorted as given', () => {
+  const v = viewState([V('A'), V('B')], {});
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['A', 'B']);
+  assert.strictEqual(v.sort, 'name');
+});
+
+test('viewState: onlyEnabled drops disabled rows', () => {
+  const v = viewState([V('On'), V('Off', { enabled: false })], { onlyEnabled: true });
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['On']);
+});
+
+test('viewState: onlyEnabled is ignored when no row knows its status', () => {
+  // Vortex's "all installed mods" view has no profile, so status is unknown.
+  // Filtering there would empty the table for no reason.
+  const v = viewState([V('A', { enabled: null }), V('B', { enabled: null })], { onlyEnabled: true });
+  assert.strictEqual(v.rows.length, 2);
+});
+
+test('viewState: search filters, and sets the search-specific empty note', () => {
+  const v = viewState([V('SkyUI'), V('Other')], { search: 'sky' });
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['SkyUI']);
+  assert.match(v.emptyNote, /match that search/);
+  assert.match(viewState([], {}).emptyNote, /current filter/);
+});
+
+// --- regression: the column-visibility bug ---
+test('viewState: column flags reflect the data actually present', () => {
+  const withAll = viewState([V('A', { size: 10, order: 1, collectionText: 'Pack' })], {});
+  assert.deepStrictEqual(
+    [withAll.hasSize, withAll.hasOrder, withAll.hasColl], [true, true, true]);
+  const withNone = viewState([V('A')], {});
+  assert.deepStrictEqual(
+    [withNone.hasSize, withNone.hasOrder, withNone.hasColl], [false, false, false]);
+});
+
+test('viewState: searching down to a row without a size keeps the size column', () => {
+  // Regression: column flags must come from the unfiltered set. Deciding from
+  // the filtered rows made the column vanish mid-search.
+  const rows = [V('Big', { size: 1000 }), V('Sizeless')];
+  const v = viewState(rows, { search: 'sizeless' });
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['Sizeless']);
+  assert.strictEqual(v.hasSize, true, 'size column should survive the search');
+});
+
+test('viewState: flags are computed after the enabled filter, not before', () => {
+  // A disabled row is the only one with an order; hiding it should hide the column.
+  const v = viewState([V('On'), V('Off', { enabled: false, order: 1 })], { onlyEnabled: true });
+  assert.strictEqual(v.hasOrder, false);
+});
+
+// --- sorting ---
+test('viewState: sorts by size, largest first, with missing sizes last', () => {
+  const v = viewState([V('S', { size: 5 }), V('L', { size: 500 }), V('None')], { sort: 'size' });
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['L', 'S', 'None']);
+});
+
+test('viewState: sorts by order when order exists', () => {
+  const v = viewState([V('Second', { order: 2 }), V('First', { order: 1 })], { sort: 'order' });
+  assert.deepStrictEqual(v.rows.map((r) => r.modId), ['First', 'Second']);
+});
+
+test('viewState: falls back to name when order is asked for but absent', () => {
+  // Regression-guard: the control must not be left pointing at a dead sort.
+  const v = viewState([V('A'), V('B')], { sort: 'order' });
+  assert.strictEqual(v.sort, 'name');
+  assert.strictEqual(v.rows.length, 2);
+});
+
+// --- totals ---
+test('viewState: totals only the rows actually shown', () => {
+  const rows = [V('A', { size: 100 }), V('B', { size: 900 })];
+  assert.strictEqual(viewState(rows, {}).totalBytes, 1000);
+  assert.strictEqual(viewState(rows, { search: 'A' }).totalBytes, 100);
+  assert.strictEqual(viewState(rows, { onlyEnabled: true }).totalBytes, 1000);
+});
+
+test('viewState: no sizes means no size text at all', () => {
+  assert.strictEqual(viewState([V('A')], {}).sizeTotalText, '');
+  assert.match(viewState([V('A', { size: 1024 })], {}).sizeTotalText, /1.0 KB on disk/);
+});
+
+test('viewState: does not mutate the array it is given', () => {
+  const rows = [V('B', { size: 1 }), V('A', { size: 2 })];
+  const before = rows.map((r) => r.modId);
+  viewState(rows, { sort: 'size' });
+  assert.deepStrictEqual(rows.map((r) => r.modId), before);
+});
+
+test('viewState: tolerates an empty or missing row set', () => {
+  for (const input of [[], null, undefined]) {
+    const v = viewState(input, {});
+    assert.deepStrictEqual(v.rows, []);
+    assert.strictEqual(v.totalBytes, 0);
+  }
 });
 
 // -------------------------------------------------- optional: real backups
