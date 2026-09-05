@@ -5,7 +5,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery } = require('./extract.js');
+const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
+        collectionMembership, collectionLabel } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -287,6 +288,120 @@ test('buildRows: modSize is preferred over fileSize, and absence is null', () =>
   }), 'skyrimse', '__all__');
   const by = Object.fromEntries(rows.map((r) => [r.name, r.size]));
   assert.deepStrictEqual(by, { Both: 100, Only: 42, None: null });
+});
+
+// ------------------------------------------------- collection membership
+
+// Collections reference their members by md5 / logicalFileName / description
+// rather than by mod id, so membership is matched rather than looked up.
+const coll = (rules) => ({
+  type: 'collection',
+  attributes: { customFileName: 'My Collection' },
+  rules,
+});
+const requires = (ref) => ({ type: 'requires', reference: ref });
+const recommends = (ref) => ({ type: 'recommends', reference: ref });
+
+test('collectionMembership: matches a member by fileMD5', () => {
+  const m = collectionMembership({
+    c: coll([requires({ fileMD5: 'abc' })]),
+    member: { attributes: { name: 'Member', fileMD5: 'abc' } },
+  });
+  assert.deepStrictEqual(m.get('member'), [{ collection: 'My Collection', optional: false }]);
+});
+
+test('collectionMembership: matches by logicalFileName', () => {
+  const m = collectionMembership({
+    c: coll([requires({ logicalFileName: 'Codeware' })]),
+    member: { attributes: { name: 'Whatever', logicalFileName: 'Codeware' } },
+  });
+  assert.strictEqual(m.get('member')[0].collection, 'My Collection');
+});
+
+test('collectionMembership: matches by description against a mod name', () => {
+  const m = collectionMembership({
+    c: coll([requires({ description: 'SkyUI' })]),
+    member: { attributes: { modName: 'SkyUI' } },
+  });
+  assert.strictEqual(m.get('member')[0].collection, 'My Collection');
+});
+
+test('collectionMembership: an md5 match wins over a name match', () => {
+  // The precise key must be preferred, or a shared name could misattribute.
+  const m = collectionMembership({
+    c: coll([requires({ fileMD5: 'exact', description: 'Shared Name' })]),
+    right: { attributes: { modName: 'Different', fileMD5: 'exact' } },
+    wrong: { attributes: { modName: 'Shared Name' } },
+  });
+  assert.ok(m.has('right'), 'md5 match should win');
+  assert.ok(!m.has('wrong'), 'name match should not also fire');
+});
+
+test('collectionMembership: recommends is marked optional, requires is not', () => {
+  const m = collectionMembership({
+    c: coll([requires({ fileMD5: 'a' }), recommends({ fileMD5: 'b' })]),
+    req: { attributes: { fileMD5: 'a' } },
+    rec: { attributes: { fileMD5: 'b' } },
+  });
+  assert.strictEqual(m.get('req')[0].optional, false);
+  assert.strictEqual(m.get('rec')[0].optional, true);
+});
+
+test('collectionMembership: a rule matching nothing installed is skipped', () => {
+  // Normal for a "recommends" the user declined -- not an error.
+  const m = collectionMembership({ c: coll([requires({ fileMD5: 'missing' })]) });
+  assert.strictEqual(m.size, 0);
+});
+
+test('collectionMembership: a collection is never a member of itself', () => {
+  const m = collectionMembership({
+    c: { type: 'collection', attributes: { customFileName: 'Self', fileMD5: 'x' },
+         rules: [requires({ fileMD5: 'x' })] },
+  });
+  assert.strictEqual(m.size, 0);
+});
+
+test('collectionMembership: a mod in two collections reports both, once each', () => {
+  const m = collectionMembership({
+    c1: { type: 'collection', attributes: { customFileName: 'One' },
+          rules: [requires({ fileMD5: 'a' }), requires({ fileMD5: 'a' })] },
+    c2: { type: 'collection', attributes: { customFileName: 'Two' },
+          rules: [requires({ fileMD5: 'a' })] },
+    member: { attributes: { fileMD5: 'a' } },
+  });
+  assert.deepStrictEqual(m.get('member').map((e) => e.collection), ['One', 'Two']);
+});
+
+test('collectionMembership: no collections means no memberships', () => {
+  assert.strictEqual(collectionMembership({ a: { attributes: { name: 'A' } } }).size, 0);
+});
+
+test('collectionLabel: formats one, many, optional, and none', () => {
+  assert.strictEqual(collectionLabel([]), '');
+  assert.strictEqual(collectionLabel(null), '');
+  assert.strictEqual(collectionLabel([{ collection: 'A', optional: false }]), 'A');
+  assert.strictEqual(collectionLabel([{ collection: 'A', optional: true }]), 'A (optional)');
+  assert.strictEqual(
+    collectionLabel([{ collection: 'A', optional: false }, { collection: 'B', optional: true }]),
+    'A, B (optional)');
+});
+
+test('buildRows: attributes members and leaves non-members blank', () => {
+  const rows = buildRows(vortex({
+    c: { type: 'collection', attributes: { customFileName: 'Pack', source: 'nexus',
+         collectionSlug: 'abc', downloadGame: 'skyrimse' },
+         rules: [requires({ fileMD5: 'm1' })] },
+    m1: { attributes: { name: 'In Pack', fileMD5: 'm1' } },
+    m2: { attributes: { name: 'Standalone' } },
+  }), 'skyrimse', '__all__');
+  const by = Object.fromEntries(rows.map((r) => [r.name, r.collectionText]));
+  assert.strictEqual(by['In Pack'], 'Pack');
+  assert.strictEqual(by['Standalone'], '');
+  assert.strictEqual(by['Pack'], '');
+});
+
+test('matchesQuery: searching a collection name finds its members', () => {
+  assert.strictEqual(matchesQuery({ name: 'Codeware', collectionText: 'CET+Essentials' }, 'essentials'), true);
 });
 
 // -------------------------------------------------- optional: real backups
