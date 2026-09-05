@@ -219,11 +219,11 @@
   <header>
     <div class="eyebrow">local · read-only · nothing leaves your browser</div>
     <h1>Modlist Exporter</h1>
-    <div class="sub">Drop in a Vortex state file and get a clean, exportable list of every mod in a profile — name, version, enabled status, and Nexus link where available. The file is parsed entirely in your browser; it's never uploaded anywhere.</div>
+    <div class="sub">Drop in a Vortex state file or a Mod Organizer 2 modlist.txt and get a clean, exportable list of your mods — name, version, and enabled status where the format provides it. The file is parsed entirely in your browser; it's never uploaded anywhere.</div>
     <details class="help">
       <summary>Where do I find the file?</summary>
       <div class="help-body">
-        Vortex doesn't have a one-click "export modlist" button, but it keeps its own state as JSON that this tool can read directly. Look in your Windows AppData folder for one of these, newest first:
+        <strong>Vortex</strong> doesn't have a one-click "export modlist" button, but it keeps its own state as JSON that this tool can read directly. Look in your Windows AppData folder for one of these, newest first:
         <ul>
           <li><code>%AppData%\Vortex\temp\state_backups_full\manual.json</code> (created via Settings → Workarounds → Backup)</li>
           <li><code>%AppData%\Vortex\temp\state_backups_full\startup.json</code></li>
@@ -233,6 +233,12 @@
         <br><br>
         If <code>startup.json</code> and <code>hourly.json</code> both look stale (weeks old, not updating when you install mods), Vortex's automatic backup scheduler may have silently stopped working on your install. The reliable fix: in Vortex, go to <strong>Settings → Workarounds</strong> and use the manual backup option — it writes a fresh <code>manual.json</code> to that same folder immediately, no waiting on the scheduler.
         <br><br>
+        <strong>Mod Organizer 2</strong> keeps a plain-text list per profile at:
+        <ul>
+          <li><code>&lt;MO2 install folder&gt;\profiles\&lt;profile name&gt;\modlist.txt</code></li>
+        </ul>
+        This file already updates live as you enable/disable or install mods, so there's no staleness issue with it the way there is with Vortex's periodic backups. Note that this format only records the mod name and enabled state — no version numbers or source links, since MO2's modlist.txt doesn't store those.
+        <br><br>
         This tool only reads mod metadata (names, versions, enabled state); it can't see your actual mod files.
       </div>
     </details>
@@ -240,18 +246,18 @@
 
   <div class="dropzone" id="dropzone">
     <div class="dz-title">Click to choose a file, or drag one here</div>
-    <div class="dz-sub">state.json · startup.json · hourly.json</div>
-    <input type="file" id="fileInput" accept=".json,application/json">
+    <div class="dz-sub">Vortex: state.json · startup.json · hourly.json — MO2: modlist.txt</div>
+    <input type="file" id="fileInput" accept=".json,application/json,.txt,text/plain">
   </div>
   <div class="status" id="status"></div>
   <div class="freshness" id="freshness"></div>
 
   <div class="controls" id="controls">
-    <div class="field">
+    <div class="field" id="gameField">
       <label for="gameSelect">Game</label>
       <select id="gameSelect"></select>
     </div>
-    <div class="field">
+    <div class="field" id="profileField">
       <label for="profileSelect">Profile</label>
       <select id="profileSelect"></select>
     </div>
@@ -303,7 +309,7 @@
   const csvBtn = document.getElementById('csvBtn');
   const txtBtn = document.getElementById('txtBtn');
 
-  let parsed = null; // { mods: {gameId: {modId: modObj}}, profiles: {profileId: profileObj} }
+  let parsed = null; // { type: 'vortex', mods, profiles } | { type: 'mo2', entries: [{name, enabled}] }
   let currentRows = [];
 
   dropzone.addEventListener('click', () => fileInput.click());
@@ -323,7 +329,7 @@
     statusEl.className = 'status' + (cls ? ' ' + cls : '');
   }
 
-  function showFreshness(file){
+  function showFreshness(file, staleMessage){
     const modified = new Date(file.lastModified);
     const ageMs = Date.now() - file.lastModified;
     const ageDays = ageMs / (1000 * 60 * 60 * 24);
@@ -333,11 +339,41 @@
     if (ageDays > 2){
       const ageDesc = ageDays > 60 ? Math.round(ageDays/30) + ' months' : Math.round(ageDays) + ' days';
       freshnessEl.className = 'freshness show stale';
-      freshnessEl.textContent = '⚠ This file is from ' + dateStr + ' (' + ageDesc + ' old). If you\'ve installed or changed mods since then, this list won\'t reflect it — see "Where do I find the file?" above, or trigger a manual backup in Vortex (Settings → Workarounds) for a fresh one.';
+      freshnessEl.textContent = '⚠ This file is from ' + dateStr + ' (' + ageDesc + ' old). ' + staleMessage;
     } else {
       freshnessEl.className = 'freshness show fresh';
       freshnessEl.textContent = '✓ File is from ' + dateStr + ' — looks current.';
     }
+  }
+
+  function parseMO2(text){
+    const lines = text.split(/\r?\n/);
+    const entries = [];
+    let order = 0; // position in the file, counted across every recognized entry
+    for (const rawLine of lines){
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue; // skip blank lines and the header comment
+      const marker = line[0];
+      if (marker !== '+' && marker !== '-' && marker !== '*') continue; // not a recognized modlist.txt line
+      const name = line.slice(1).trim();
+      if (!name) continue;
+      const position = order++;
+      // MO2 writes its priority-pane separators into modlist.txt as ordinary
+      // entries suffixed with _separator. They aren't mods, so keep them out
+      // of the list and the count -- but let them consume a position so the
+      // remaining order values still line up with the file.
+      if (/_separator$/.test(name)) continue;
+      entries.push({
+        name,
+        enabled: marker !== '-',
+        // '*' marks content MO2 does not manage itself (base game / DLC).
+        unmanaged: marker === '*',
+        // Raw file position. NOT yet treated as load order -- the direction
+        // of modlist.txt ordering is still unverified. See README.
+        order: position
+      });
+    }
+    return entries;
   }
 
   function handleFile(file){
@@ -345,31 +381,54 @@
     freshnessEl.classList.remove('show');
     const reader = new FileReader();
     reader.onload = e => {
-      let json;
-      try{
-        json = JSON.parse(e.target.result);
-      }catch(err){
-        setStatus('That file isn\'t valid JSON — make sure you picked state.json, startup.json, or hourly.json.', 'err');
+      const text = e.target.result;
+      let json = null;
+      let jsonError = null;
+      try{ json = JSON.parse(text); }catch(err){ jsonError = err; }
+
+      if (json !== null){
+        // --- Vortex JSON path ---
+        const root = json.persistent ? json.persistent : json; // some backups are stored unwrapped
+        const mods = root && root.mods;
+        const profiles = root && root.profiles;
+        if (!mods || typeof mods !== 'object' || Object.keys(mods).length === 0){
+          const topKeys = json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : '(not an object)';
+          setStatus('No mods found in this file. Top-level keys it does contain: ' + topKeys + '. This is probably the wrong file — the full mod list lives in AppData\\Roaming\\Vortex\\temp\\state_backups_full\\, not the root Vortex folder.', 'err');
+          return;
+        }
+        parsed = { type: 'vortex', mods, profiles: profiles || {} };
+        setStatus('Loaded ' + file.name + ' ✓', 'ok');
+        showFreshness(file, 'If you\'ve installed or changed mods since then, this list won\'t reflect it — see "Where do I find the file?" above, or trigger a manual backup in Vortex (Settings → Workarounds) for a fresh one.');
+        populateGames();
         return;
       }
-      const root = json.persistent ? json.persistent : json; // some backups are stored unwrapped
-      const mods = root && root.mods;
-      const profiles = root && root.profiles;
-      if (!mods || typeof mods !== 'object' || Object.keys(mods).length === 0){
-        const topKeys = json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : '(not an object)';
-        setStatus('No mods found in this file. Top-level keys it does contain: ' + topKeys + '. This is probably the wrong file — the full mod list lives in AppData\\Roaming\\Vortex\\temp\\state_backups_full\\, not the root Vortex folder.', 'err');
+
+      // --- Not JSON: try MO2 modlist.txt ---
+      const entries = parseMO2(text);
+      if (entries.length === 0){
+        // A file that starts like JSON but won't parse is almost always a
+        // truncated or half-written Vortex backup rather than the wrong file
+        // — worth saying so, since Vortex's scheduler is known to misbehave.
+        const looksLikeJson = /^[\s\uFEFF]*[{[]/.test(text);
+        if (looksLikeJson){
+          setStatus('This looks like a Vortex state file, but it isn\'t valid JSON — it\'s most likely truncated or was written while Vortex was mid-save. Error: ' + (jsonError && jsonError.message ? jsonError.message : 'unknown') + '. Try another file in state_backups_full\\, or trigger a fresh manual backup in Vortex (Settings → Workarounds).', 'err');
+        } else {
+          setStatus('Couldn\'t recognize this file as either a Vortex state file (invalid JSON) or an MO2 modlist.txt (no lines starting with +, - or *). Double check you picked the right file — see "Where do I find the file?" above.', 'err');
+        }
         return;
       }
-      parsed = { mods, profiles: profiles || {} };
+      parsed = { type: 'mo2', entries };
       setStatus('Loaded ' + file.name + ' ✓', 'ok');
-      showFreshness(file);
-      populateGames();
+      showFreshness(file, 'MO2\'s modlist.txt updates live as you change mods, so a stale file usually means you copied it somewhere instead of loading it from the profile folder directly.');
+      populateMO2();
     };
     reader.onerror = () => setStatus('Could not read that file.', 'err');
     reader.readAsText(file);
   }
 
   function populateGames(){
+    document.getElementById('gameField').style.display = '';
+    document.getElementById('profileField').style.display = '';
     const gameIds = Object.keys(parsed.mods).filter(g => parsed.mods[g] && Object.keys(parsed.mods[g]).length > 0);
     gameSelect.innerHTML = '';
     gameIds.forEach(g => {
@@ -381,6 +440,13 @@
     controls.classList.add('show');
     gameSelect.onchange = () => populateProfiles(gameSelect.value);
     populateProfiles(gameSelect.value);
+  }
+
+  function populateMO2(){
+    document.getElementById('gameField').style.display = 'none';
+    document.getElementById('profileField').style.display = 'none';
+    controls.classList.add('show');
+    render();
   }
 
   function populateProfiles(gameId){
@@ -410,6 +476,19 @@
   }
 
   function buildRows(){
+    if (parsed.type === 'mo2'){
+      let rows = parsed.entries.map(entry => ({
+        modId: entry.name, name: entry.name, version: '—',
+        enabled: entry.enabled, sourceUrl: null,
+        source: entry.unmanaged ? 'unmanaged' : '—',
+        // Preserved so a future load-order view can restore file order; the
+        // table itself still displays alphabetically.
+        order: entry.order
+      }));
+      rows.sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
+      return rows;
+    }
+
     const gameId = gameSelect.value;
     const profileKey = profileSelect.value;
     const gameMods = parsed.mods[gameId] || {};
@@ -423,7 +502,10 @@
       const nexusModId = attr.modId;
       const fileSource = attr.source || '';
       let sourceUrl = null;
-      if (fileSource === 'nexus' && nexusModId){
+      // gameId and nexusModId come from the state file, so only build a link
+      // when both look like what Nexus URLs actually contain.
+      if (fileSource === 'nexus' && /^[a-z0-9]+$/i.test(String(gameId)) &&
+          /^[0-9]+$/.test(String(nexusModId))){
         sourceUrl = 'https://www.nexusmods.com/' + gameId + '/mods/' + nexusModId;
       }
       let enabled = null;
@@ -454,8 +536,16 @@
       const tr = document.createElement('tr');
 
       const nameTd = document.createElement('td');
-      nameTd.innerHTML = '<div class="mod-name">' + escapeHtml(r.name) + '</div>' +
-        (r.modId !== r.name ? '<div class="mod-file">' + escapeHtml(r.modId) + '</div>' : '');
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'mod-name';
+      nameDiv.textContent = r.name;
+      nameTd.appendChild(nameDiv);
+      if (r.modId !== r.name){
+        const idDiv = document.createElement('div');
+        idDiv.className = 'mod-file';
+        idDiv.textContent = r.modId;
+        nameTd.appendChild(idDiv);
+      }
       tr.appendChild(nameTd);
 
       const verTd = document.createElement('td');
@@ -473,7 +563,16 @@
 
       const srcTd = document.createElement('td');
       srcTd.className = 'src';
-      srcTd.innerHTML = r.sourceUrl ? '<a href="' + r.sourceUrl + '" target="_blank" rel="noopener">' + escapeHtml(r.source) + ' ↗</a>' : escapeHtml(r.source);
+      if (r.sourceUrl){
+        const a = document.createElement('a');
+        a.href = r.sourceUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = r.source + ' ↗';
+        srcTd.appendChild(a);
+      } else {
+        srcTd.textContent = r.source;
+      }
       tr.appendChild(srcTd);
 
       tbody.appendChild(tr);
@@ -488,8 +587,8 @@
 
   onlyEnabled.addEventListener('change', render);
 
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function exportBaseName(){
+    return (parsed && parsed.type === 'mo2') ? 'mo2-modlist' : 'vortex-modlist';
   }
 
   function download(filename, content, mime){
@@ -501,15 +600,24 @@
     URL.revokeObjectURL(url);
   }
 
+  // Spreadsheet apps treat a leading = + - @ (or tab / carriage return) as the
+  // start of a formula. Mod names are written by mod authors, so quote-prefix
+  // those instead of handing Excel something it will try to execute.
+  function csvCell(value){
+    let v = String(value);
+    if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+
   csvBtn.addEventListener('click', () => {
     const header = ['Name','Version','Status','Source','Source URL'];
     const lines = [header.join(',')];
     currentRows.forEach(r => {
       const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
       const fields = [r.name, r.version, status, r.source, r.sourceUrl || ''];
-      lines.push(fields.map(f => '"' + String(f).replace(/"/g,'""') + '"').join(','));
+      lines.push(fields.map(csvCell).join(','));
     });
-    download('vortex-modlist.csv', lines.join('\n'), 'text/csv');
+    download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
   });
 
   txtBtn.addEventListener('click', () => {
@@ -517,7 +625,7 @@
       const status = r.enabled === null ? '' : (r.enabled ? ' [enabled]' : ' [disabled]');
       return r.name + ' — ' + r.version + status;
     });
-    download('vortex-modlist.txt', lines.join('\n'), 'text/plain');
+    download(exportBaseName() + '.txt', lines.join('\n'), 'text/plain');
   });
 
   copyBtn.addEventListener('click', () => {
