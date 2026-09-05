@@ -67,6 +67,11 @@ In both cases:
 - The browser's `File.lastModified` timestamp is checked against the current
   time to warn if the snapshot looks stale.
 - Results render into a sortable table with CSV / .txt / clipboard export.
+- Mod names come from mod authors, so they're treated as untrusted: table
+  cells are built as DOM text nodes rather than HTML, Nexus links are only
+  constructed when the game and mod IDs actually look like IDs, and CSV
+  fields that begin with `=`, `+`, `-` or `@` are quote-prefixed so
+  spreadsheet apps don't evaluate them as formulas.
 
 ## Notes on file locations
 

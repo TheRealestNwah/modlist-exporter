@@ -383,7 +383,8 @@
     reader.onload = e => {
       const text = e.target.result;
       let json = null;
-      try{ json = JSON.parse(text); }catch(err){ json = null; }
+      let jsonError = null;
+      try{ json = JSON.parse(text); }catch(err){ jsonError = err; }
 
       if (json !== null){
         // --- Vortex JSON path ---
@@ -405,7 +406,15 @@
       // --- Not JSON: try MO2 modlist.txt ---
       const entries = parseMO2(text);
       if (entries.length === 0){
-        setStatus('Couldn\'t recognize this file as either a Vortex state file (invalid JSON) or an MO2 modlist.txt (no lines starting with + or -). Double check you picked the right file — see "Where do I find the file?" above.', 'err');
+        // A file that starts like JSON but won't parse is almost always a
+        // truncated or half-written Vortex backup rather than the wrong file
+        // — worth saying so, since Vortex's scheduler is known to misbehave.
+        const looksLikeJson = /^[\s\uFEFF]*[{[]/.test(text);
+        if (looksLikeJson){
+          setStatus('This looks like a Vortex state file, but it isn\'t valid JSON — it\'s most likely truncated or was written while Vortex was mid-save. Error: ' + (jsonError && jsonError.message ? jsonError.message : 'unknown') + '. Try another file in state_backups_full\\, or trigger a fresh manual backup in Vortex (Settings → Workarounds).', 'err');
+        } else {
+          setStatus('Couldn\'t recognize this file as either a Vortex state file (invalid JSON) or an MO2 modlist.txt (no lines starting with +, - or *). Double check you picked the right file — see "Where do I find the file?" above.', 'err');
+        }
         return;
       }
       parsed = { type: 'mo2', entries };
@@ -493,7 +502,10 @@
       const nexusModId = attr.modId;
       const fileSource = attr.source || '';
       let sourceUrl = null;
-      if (fileSource === 'nexus' && nexusModId){
+      // gameId and nexusModId come from the state file, so only build a link
+      // when both look like what Nexus URLs actually contain.
+      if (fileSource === 'nexus' && /^[a-z0-9]+$/i.test(String(gameId)) &&
+          /^[0-9]+$/.test(String(nexusModId))){
         sourceUrl = 'https://www.nexusmods.com/' + gameId + '/mods/' + nexusModId;
       }
       let enabled = null;
@@ -524,8 +536,16 @@
       const tr = document.createElement('tr');
 
       const nameTd = document.createElement('td');
-      nameTd.innerHTML = '<div class="mod-name">' + escapeHtml(r.name) + '</div>' +
-        (r.modId !== r.name ? '<div class="mod-file">' + escapeHtml(r.modId) + '</div>' : '');
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'mod-name';
+      nameDiv.textContent = r.name;
+      nameTd.appendChild(nameDiv);
+      if (r.modId !== r.name){
+        const idDiv = document.createElement('div');
+        idDiv.className = 'mod-file';
+        idDiv.textContent = r.modId;
+        nameTd.appendChild(idDiv);
+      }
       tr.appendChild(nameTd);
 
       const verTd = document.createElement('td');
@@ -543,7 +563,16 @@
 
       const srcTd = document.createElement('td');
       srcTd.className = 'src';
-      srcTd.innerHTML = r.sourceUrl ? '<a href="' + r.sourceUrl + '" target="_blank" rel="noopener">' + escapeHtml(r.source) + ' ↗</a>' : escapeHtml(r.source);
+      if (r.sourceUrl){
+        const a = document.createElement('a');
+        a.href = r.sourceUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = r.source + ' ↗';
+        srcTd.appendChild(a);
+      } else {
+        srcTd.textContent = r.source;
+      }
       tr.appendChild(srcTd);
 
       tbody.appendChild(tr);
@@ -558,10 +587,6 @@
 
   onlyEnabled.addEventListener('change', render);
 
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-
   function exportBaseName(){
     return (parsed && parsed.type === 'mo2') ? 'mo2-modlist' : 'vortex-modlist';
   }
@@ -575,13 +600,22 @@
     URL.revokeObjectURL(url);
   }
 
+  // Spreadsheet apps treat a leading = + - @ (or tab / carriage return) as the
+  // start of a formula. Mod names are written by mod authors, so quote-prefix
+  // those instead of handing Excel something it will try to execute.
+  function csvCell(value){
+    let v = String(value);
+    if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+
   csvBtn.addEventListener('click', () => {
     const header = ['Name','Version','Status','Source','Source URL'];
     const lines = [header.join(',')];
     currentRows.forEach(r => {
       const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
       const fields = [r.name, r.version, status, r.source, r.sourceUrl || ''];
-      lines.push(fields.map(f => '"' + String(f).replace(/"/g,'""') + '"').join(','));
+      lines.push(fields.map(csvCell).join(','));
     });
     download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
   });
