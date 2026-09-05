@@ -242,7 +242,23 @@
   .chg .to{ color: var(--ink); }
   #diffTable{ display:none; }
   #diffTable.show{ display:table; }
-  .ver, .src, .ord{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
+  .ver, .src, .ord, .size{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
+  .size{ text-align: right; white-space: nowrap; }
+  /* MO2's modlist.txt records no sizes, so the column is hidden for it. */
+  #modTable.no-size th.size-col, #modTable.no-size td.size{ display: none; }
+  #searchInput{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: var(--sans);
+    min-width: 220px;
+  }
+  #searchInput:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+  #searchInput::placeholder{ color: var(--ink-dim); }
+  .size-total{ color: var(--ink-dim); }
   .ord{ text-align: right; width: 1%; white-space: nowrap; padding-right: 14px; }
   /* Only MO2 files carry a verified order, so the column is hidden otherwise. */
   #modTable.no-order th.ord-col, #modTable.no-order td.ord{ display: none; }
@@ -307,11 +323,16 @@
       <label for="profileSelect">Profile</label>
       <select id="profileSelect"></select>
     </div>
+    <div class="field" id="searchField">
+      <label for="searchInput">Search</label>
+      <input type="search" id="searchInput" placeholder="filter by name…" autocomplete="off">
+    </div>
     <div class="field" id="sortField">
       <label for="sortSelect">Sort</label>
       <select id="sortSelect">
         <option value="name">Name (A–Z)</option>
-        <option value="order">MO2 priority order</option>
+        <option value="size">Size (largest first)</option>
+        <option value="order" id="sortOrderOption">MO2 priority order</option>
       </select>
     </div>
     <div class="toggle-row">
@@ -334,7 +355,7 @@
   <div class="diff-basis" id="diffBasis"></div>
 
   <div class="summary-bar" id="summaryBar">
-    <div class="count"><strong id="modCount">0</strong> <span id="countLabel">mods</span></div>
+    <div class="count"><strong id="modCount">0</strong> <span id="countLabel">mods</span><span class="size-total" id="sizeTotal"></span></div>
     <div class="export-btns">
       <button id="copyBtn">Copy as text</button>
       <button id="csvBtn">Download CSV</button>
@@ -348,6 +369,7 @@
         <th class="ord-col" title="Position in MO2's priority pane, top first">#</th>
         <th>Mod</th>
         <th>Version</th>
+        <th class="size-col">Size</th>
         <th>Status</th>
         <th>Source</th>
       </tr>
@@ -410,6 +432,10 @@
   const diffTable = document.getElementById('diffTable');
   const diffTableBody = document.getElementById('diffTableBody');
   const countLabel = document.getElementById('countLabel');
+  const searchInput = document.getElementById('searchInput');
+  const searchField = document.getElementById('searchField');
+  const sizeTotal = document.getElementById('sizeTotal');
+  const sortOrderOption = document.getElementById('sortOrderOption');
   const diffFilters = document.getElementById('diffFilters');
   const filterInputs = [...diffFilters.querySelectorAll('input[data-change]')];
 
@@ -684,7 +710,9 @@
       if (modState){
         enabled = !!(modState[modId] && modState[modId].enabled);
       }
-      return { modId, name, version, enabled, sourceUrl, source };
+      const size = typeof attr.modSize === 'number' ? attr.modSize
+        : (typeof attr.fileSize === 'number' ? attr.fileSize : null);
+      return { modId, name, version, enabled, sourceUrl, source, size };
     });
 
     rows.sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
@@ -698,13 +726,24 @@
       rows = rows.filter(r => r.enabled !== false);
     }
 
-    // Only MO2 files carry a verified order, so hide the column and the sort
-    // control for anything else.
-    const hasOrder = rows.some(r => typeof r.order === 'number');
-    sortField.style.display = hasOrder ? '' : 'none';
+    // Column visibility is decided from the unfiltered set, so searching down
+    // to a single mod with no recorded size doesn't make the column vanish.
+    const unfiltered = rows;
+    rows = rows.filter(r => matchesQuery(r, searchInput.value));
+
+    // Only MO2 files carry a verified order; only Vortex files carry sizes.
+    // Hide each column, and each sort option, where the data doesn't exist.
+    const hasOrder = unfiltered.some(r => typeof r.order === 'number');
+    const hasSize = unfiltered.some(r => typeof r.size === 'number');
     table.classList.toggle('no-order', !hasOrder);
-    if (hasOrder && sortSelect.value === 'order'){
+    table.classList.toggle('no-size', !hasSize);
+    sortOrderOption.hidden = !hasOrder;
+    if (!hasOrder && sortSelect.value === 'order') sortSelect.value = 'name';
+
+    if (sortSelect.value === 'order' && hasOrder){
       rows = rows.slice().sort((a,b) => a.order - b.order);
+    } else if (sortSelect.value === 'size'){
+      rows = rows.slice().sort((a,b) => (b.size || 0) - (a.size || 0));
     }
 
     tbody.innerHTML = '';
@@ -734,6 +773,11 @@
       verTd.textContent = r.version;
       tr.appendChild(verTd);
 
+      const sizeTd = document.createElement('td');
+      sizeTd.className = 'size';
+      sizeTd.textContent = formatSize(r.size);
+      tr.appendChild(sizeTd);
+
       const statTd = document.createElement('td');
       if (r.enabled === null){
         statTd.innerHTML = '<span class="ver">—</span>';
@@ -760,6 +804,11 @@
     });
 
     modCount.textContent = rows.length;
+    const totalBytes = rows.reduce((sum, r) => sum + (typeof r.size === 'number' ? r.size : 0), 0);
+    sizeTotal.textContent = totalBytes > 0 ? '  ·  ' + formatSize(totalBytes) + ' on disk' : '';
+    emptyNote.textContent = searchInput.value.trim()
+      ? 'No mods match that search.'
+      : 'No mods match the current filter.';
     table.classList.toggle('show', rows.length > 0);
     emptyNote.classList.toggle('show', rows.length === 0);
     summaryBar.classList.add('show');
@@ -904,6 +953,7 @@
       table.classList.remove('show');
       controls.classList.remove('show');
       diffFilters.classList.add('show');
+      sizeTotal.textContent = '';
       renderDiff();
     } else {
       diffTable.classList.remove('show');
@@ -922,6 +972,7 @@
   }
 
   onlyEnabled.addEventListener('change', refresh);
+  searchInput.addEventListener('input', () => { if (view === 'list') render(); });
   sortSelect.addEventListener('change', refresh);
   filterInputs.forEach(i => i.addEventListener('change', () => { if (view === 'diff') renderDiff(); }));
   viewListBtn.addEventListener('click', () => setView('list'));
@@ -959,6 +1010,29 @@
     let v = String(value);
     if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
     return '"' + v.replace(/"/g, '""') + '"';
+  }
+
+  // Sizes come out of the state file in bytes. Vortex reports whole-mod size
+  // as modSize and the downloaded archive as fileSize; prefer the former.
+  function formatSize(bytes){
+    if (typeof bytes !== 'number' || !isFinite(bytes) || bytes <= 0) return '—';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    let n = bytes;
+    while (n >= 1024 && i < units.length - 1){ n /= 1024; i++; }
+    // Whole numbers above 100 don't need a decimal to be readable.
+    const digits = i === 0 ? 0 : (n >= 100 ? 0 : 1);
+    return n.toFixed(digits) + ' ' + units[i];
+  }
+
+  // Case- and diacritic-insensitive substring match over the fields a person
+  // would actually search by.
+  function matchesQuery(row, query){
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return true;
+    const hay = [row.name, row.modId, row.version, row.source]
+      .filter(Boolean).join(' ').toLowerCase();
+    return q.split(/\s+/).every(term => hay.indexOf(term) !== -1);
   }
 
   function statusLabel(enabled){
@@ -1043,12 +1117,16 @@
       return;
     }
     const withOrder = exportHasOrder();
-    const header = (withOrder ? ['#'] : []).concat(['Name','Version','Status','Source','Source URL']);
+    const withSize = currentRows.some(r => typeof r.size === 'number');
+    const header = (withOrder ? ['#'] : [])
+      .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [], ['Status','Source','Source URL']);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
       const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
       const fields = (withOrder ? [typeof r.order === 'number' ? r.order : ''] : [])
-        .concat([r.name, r.version, status, r.source, r.sourceUrl || '']);
+        .concat([r.name, r.version],
+          withSize ? [formatSize(r.size), typeof r.size === 'number' ? r.size : ''] : [],
+          [status, r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
     download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');

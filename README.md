@@ -8,7 +8,7 @@ browser, with exports available as CSV, plain text, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-![The mod list view: a Skyrim Special Edition profile with versions, enabled status, Nexus links and an installed collection](docs/screenshot.png)
+![The mod list view: a Skyrim Special Edition profile showing search and sort controls, per-mod install sizes with a disk total, enabled status, Nexus links and an installed collection](docs/screenshot.png)
 
 <sub>Example data — not a real load order.</sub>
 
@@ -26,6 +26,11 @@ browser, with exports available as CSV, plain text, or clipboard copy.
     enabled/disabled status, and the mod's position in MO2's priority pane,
     with an optional sort by that order (MO2's format doesn't store version
     or source data)
+- **Search and sort** — filter the list by name, mod ID, version or source;
+  sort by name, install size, or MO2 priority order
+- **Install size** — per-mod size and a total for whatever is currently shown,
+  so you can see what's actually using the disk (Vortex only; MO2's
+  `modlist.txt` records no sizes)
 - **File freshness check** — flags when the loaded file is more than a
   couple days old, so you don't export a stale list without realizing it
 - **Compare two snapshots** — load a second file to see what changed between
@@ -138,9 +143,15 @@ In both cases:
   `JSON.parse` entirely in-browser.
 - The browser's `File.lastModified` timestamp is checked against the current
   time to warn if the snapshot looks stale.
-- Results render into a table with CSV / .txt / clipboard export. MO2 files
-  can additionally be sorted by priority order; Vortex files have no
-  comparable ordering, so that control is hidden for them.
+- Results render into a table with CSV / .txt / clipboard export. Sorting is
+  by name, install size, or — for MO2 files only — priority order. Columns
+  and sort options are hidden where the format carries no such data: MO2
+  files have no sizes, Vortex files have no comparable ordering.
+- Sizes come from Vortex's `modSize` (falling back to `fileSize`), in bytes.
+  The CSV export includes both the formatted size and the raw byte count, so
+  it stays sortable in a spreadsheet.
+- The search box filters on name, mod ID, version and source. Multiple terms
+  all have to match, in any order.
 - Mod names come from mod authors, so they're treated as untrusted: table
   cells are built as DOM text nodes rather than HTML, Nexus links are only
   constructed when the game and mod IDs actually look like IDs, and CSV
