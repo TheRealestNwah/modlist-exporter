@@ -31,6 +31,9 @@ const NAMES = [
   'missingCollectionMembers',
   'endorsementLabel',
   'isUnendorsed',
+  'defaultProfileFor',
+  'gamesWithMods',
+  'allGamesRows',
 ];
 
 function extract() {

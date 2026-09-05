@@ -380,6 +380,7 @@
       <button id="copyBtn">Copy as text</button>
       <button id="csvBtn">Download CSV</button>
       <button id="txtBtn">Download .txt</button>
+      <button id="allGamesBtn" title="Every game in one CSV, with a Game column">All games CSV</button>
     </div>
   </div>
 
@@ -463,6 +464,7 @@
   const notEndorsed = document.getElementById('notEndorsed');
   const notEndorsedField = document.getElementById('notEndorsedField');
   const missingNote = document.getElementById('missingNote');
+  const allGamesBtn = document.getElementById('allGamesBtn');
   const diffFilters = document.getElementById('diffFilters');
   const filterInputs = [...diffFilters.querySelectorAll('input[data-change]')];
 
@@ -769,6 +771,8 @@
     table.classList.toggle('no-coll', !view.hasColl);
     table.classList.toggle('no-endo', !view.hasEndo);
     notEndorsedField.style.display = view.hasEndo ? '' : 'none';
+    // Only worth offering when there's more than one game to combine.
+    allGamesBtn.style.display = gamesWithMods(parsed).length > 1 ? '' : 'none';
     sortOrderOption.hidden = !view.hasOrder;
     // viewState falls back when the chosen sort has no data behind it; reflect
     // that back into the control so the two don't disagree.
@@ -1037,6 +1041,7 @@
       diffFilters.classList.add('show');
       sizeTotal.textContent = '';
       missingNote.classList.remove('show');
+      allGamesBtn.style.display = 'none';
       renderDiff();
     } else {
       diffTable.classList.remove('show');
@@ -1268,6 +1273,39 @@
     return value === 'Undecided' || value === 'pending';
   }
 
+  // Vortex keeps enabled state on the profile, so an export needs to pick one
+  // per game. Most recently activated wins; games with no profile at all fall
+  // back to their full installed list, where status reads as unknown.
+  function defaultProfileFor(source, gameId){
+    const matching = Object.keys((source && source.profiles) || {})
+      .filter(id => {
+        const p = source.profiles[id];
+        return p && p.gameId === gameId;
+      })
+      .sort((a, b) => (source.profiles[b].lastActivated || 0) - (source.profiles[a].lastActivated || 0));
+    return matching.length ? matching[0] : '__all__';
+  }
+
+  function gamesWithMods(source){
+    if (!source || source.type !== 'vortex') return [];
+    return Object.keys(source.mods || {})
+      .filter(g => source.mods[g] && Object.keys(source.mods[g]).length > 0);
+  }
+
+  // Every game flattened into one row set, each row tagged with its game.
+  // The same view filters are applied per game, so the export matches what
+  // you'd see if you stepped through each game in turn.
+  function allGamesRows(source, opts){
+    const out = [];
+    gamesWithMods(source).forEach(gameId => {
+      const rows = buildRows(source, gameId, defaultProfileFor(source, gameId));
+      viewState(rows, opts).rows.forEach(r => {
+        out.push(Object.assign({ game: gameId }, r));
+      });
+    });
+    return out;
+  }
+
   function statusLabel(enabled){
     return enabled === null || enabled === undefined ? '—' : (enabled ? 'enabled' : 'disabled');
   }
@@ -1369,6 +1407,29 @@
       lines.push(fields.map(csvCell).join(','));
     });
     download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
+  });
+
+  allGamesBtn.addEventListener('click', () => {
+    const rows = allGamesRows(parsed, {
+      onlyEnabled: onlyEnabled.checked,
+      notEndorsedOnly: notEndorsed.checked,
+      search: searchInput.value,
+      sort: sortSelect.value,
+    });
+    // Fixed columns regardless of what each game happens to carry, so the
+    // sheet stays rectangular and sortable.
+    const lines = [['Game','Name','Version','Size','Size (bytes)','From collection',
+      'Endorsed','Status','Source','Source URL'].join(',')];
+    rows.forEach(r => {
+      lines.push([
+        r.game, r.name, r.version,
+        formatSize(r.size), typeof r.size === 'number' ? r.size : '',
+        r.collectionText || '', endorsementLabel(r.endorsed),
+        r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled'),
+        r.source, r.sourceUrl || '',
+      ].map(csvCell).join(','));
+    });
+    download('vortex-modlist-all-games.csv', lines.join('\n'), 'text/csv');
   });
 
   txtBtn.addEventListener('click', () => {

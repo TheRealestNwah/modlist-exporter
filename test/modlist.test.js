@@ -7,7 +7,8 @@ const path = require('node:path');
 
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
         collectionMembership, collectionLabel, viewState,
-        missingCollectionMembers, endorsementLabel, isUnendorsed } = require('./extract.js');
+        missingCollectionMembers, endorsementLabel, isUnendorsed,
+        defaultProfileFor, gamesWithMods, allGamesRows } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -596,6 +597,74 @@ test('viewState: the not-endorsed filter keeps only undecided mods', () => {
 test('viewState: hasEndo reflects whether any endorsement data exists', () => {
   assert.strictEqual(viewState([V('A', { endorsed: 'Undecided' })], {}).hasEndo, true);
   assert.strictEqual(viewState([V('A')], {}).hasEndo, false);
+});
+
+// --------------------------------------------------------- all-games export
+
+const multi = (games, profiles) => ({ type: 'vortex', mods: games, profiles: profiles || {} });
+
+test('gamesWithMods: skips games with no mods in them', () => {
+  const src = multi({ full: { a: { attributes: {} } }, empty: {} });
+  assert.deepStrictEqual(gamesWithMods(src), ['full']);
+});
+
+test('gamesWithMods: an MO2 file has no games to enumerate', () => {
+  assert.deepStrictEqual(gamesWithMods({ type: 'mo2', entries: [] }), []);
+  assert.deepStrictEqual(gamesWithMods(null), []);
+});
+
+test('defaultProfileFor: picks the most recently activated profile', () => {
+  const src = multi({ g: {} }, {
+    old: { gameId: 'g', name: 'Old', lastActivated: 1 },
+    recent: { gameId: 'g', name: 'Recent', lastActivated: 99 },
+    other: { gameId: 'elsewhere', name: 'Other', lastActivated: 100 },
+  });
+  assert.strictEqual(defaultProfileFor(src, 'g'), 'recent');
+});
+
+test('defaultProfileFor: falls back to the full installed list with no profile', () => {
+  // One real game has mods but no profile at all; it must still export.
+  assert.strictEqual(defaultProfileFor(multi({ g: {} }, {}), 'g'), '__all__');
+});
+
+test('allGamesRows: tags every row with its game', () => {
+  const src = multi({
+    skyrimse: { a: { attributes: { name: 'A' } } },
+    morrowind: { b: { attributes: { name: 'B' } }, c: { attributes: { name: 'C' } } },
+  });
+  const rows = allGamesRows(src, {});
+  assert.strictEqual(rows.length, 3);
+  assert.strictEqual(rows.filter((r) => !r.game).length, 0);
+  const byGame = rows.reduce((acc, r) => { acc[r.game] = (acc[r.game] || 0) + 1; return acc; }, {});
+  assert.deepStrictEqual(byGame, { skyrimse: 1, morrowind: 2 });
+});
+
+test('allGamesRows: uses each game its own profile for enabled state', () => {
+  const src = multi(
+    { g1: { m: { attributes: { name: 'One' } } }, g2: { m: { attributes: { name: 'Two' } } } },
+    { p1: { gameId: 'g1', modState: { m: { enabled: false } } } });
+  const rows = allGamesRows(src, {});
+  const by = Object.fromEntries(rows.map((r) => [r.game, r.enabled]));
+  assert.strictEqual(by.g1, false, 'g1 has a profile, so status is known');
+  assert.strictEqual(by.g2, null, 'g2 has none, so status is unknown');
+});
+
+test('allGamesRows: applies the view filters to every game', () => {
+  const src = multi(
+    { g1: { a: { attributes: { name: 'Water Mod' } }, b: { attributes: { name: 'Other' } } },
+      g2: { c: { attributes: { name: 'Water Two' } } } });
+  assert.strictEqual(allGamesRows(src, {}).length, 3);
+  assert.strictEqual(allGamesRows(src, { search: 'water' }).length, 2);
+});
+
+test('allGamesRows: an MO2 file exports nothing here', () => {
+  // The all-games export is Vortex-only; modlist.txt is one profile of one game.
+  assert.deepStrictEqual(allGamesRows({ type: 'mo2', entries: [{ name: 'A' }] }, {}), []);
+});
+
+test('allGamesRows: no games means no rows rather than a throw', () => {
+  assert.deepStrictEqual(allGamesRows(multi({}), {}), []);
+  assert.deepStrictEqual(allGamesRows(null, {}), []);
 });
 
 // -------------------------------------------------- optional: real backups
