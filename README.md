@@ -365,12 +365,18 @@ comparable ordering.
 
 ## AI disclosure
 
-This project's code, documentation, and repo setup (including the GitHub
-Actions workflow) were built in collaboration with Claude (Anthropic), used
-conversationally to write and iterate on the implementation, debug the
-GitHub Pages deployment, and draft this README. Testing, real-world Vortex
-file troubleshooting, and all direction on features and scope were done by
-the project owner.
+This project's code, documentation, and repo setup — including the GitHub
+Actions workflows and the test suite — were built in collaboration with
+Claude (Anthropic), used conversationally to write and iterate on the
+implementation, debug the GitHub Pages deployment, and draft this README.
+
+Testing is a mix. The automated suite was written with Claude, as was the
+verification against local Vortex and Mod Organizer 2 installs. Some findings
+depended on observations only the project owner could make: MO2's priority
+pane order, for one, which is what settled how `modlist.txt` ordering is
+interpreted here.
+
+Direction on features and scope was the project owner's throughout.
 
 ## Contributing
 
