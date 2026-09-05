@@ -732,32 +732,21 @@
 
   function render(){
     if (!parsed) return;
-    let rows = buildRows(parsed, gameSelect.value, profileSelect.value);
-    if (onlyEnabled.checked && rows.some(r => r.enabled !== null)){
-      rows = rows.filter(r => r.enabled !== false);
-    }
 
-    // Column visibility is decided from the unfiltered set, so searching down
-    // to a single mod with no recorded size doesn't make the column vanish.
-    const unfiltered = rows;
-    rows = rows.filter(r => matchesQuery(r, searchInput.value));
+    const view = viewState(buildRows(parsed, gameSelect.value, profileSelect.value), {
+      onlyEnabled: onlyEnabled.checked,
+      search: searchInput.value,
+      sort: sortSelect.value,
+    });
+    const rows = view.rows;
 
-    // Only MO2 files carry a verified order; only Vortex files carry sizes.
-    // Hide each column, and each sort option, where the data doesn't exist.
-    const hasOrder = unfiltered.some(r => typeof r.order === 'number');
-    const hasSize = unfiltered.some(r => typeof r.size === 'number');
-    const hasColl = unfiltered.some(r => r.collectionText);
-    table.classList.toggle('no-order', !hasOrder);
-    table.classList.toggle('no-size', !hasSize);
-    table.classList.toggle('no-coll', !hasColl);
-    sortOrderOption.hidden = !hasOrder;
-    if (!hasOrder && sortSelect.value === 'order') sortSelect.value = 'name';
-
-    if (sortSelect.value === 'order' && hasOrder){
-      rows = rows.slice().sort((a,b) => a.order - b.order);
-    } else if (sortSelect.value === 'size'){
-      rows = rows.slice().sort((a,b) => (b.size || 0) - (a.size || 0));
-    }
+    table.classList.toggle('no-order', !view.hasOrder);
+    table.classList.toggle('no-size', !view.hasSize);
+    table.classList.toggle('no-coll', !view.hasColl);
+    sortOrderOption.hidden = !view.hasOrder;
+    // viewState falls back when the chosen sort has no data behind it; reflect
+    // that back into the control so the two don't disagree.
+    if (sortSelect.value !== view.sort) sortSelect.value = view.sort;
 
     tbody.innerHTML = '';
     rows.forEach(r => {
@@ -835,11 +824,8 @@
     });
 
     modCount.textContent = rows.length;
-    const totalBytes = rows.reduce((sum, r) => sum + (typeof r.size === 'number' ? r.size : 0), 0);
-    sizeTotal.textContent = totalBytes > 0 ? '  ·  ' + formatSize(totalBytes) + ' on disk' : '';
-    emptyNote.textContent = searchInput.value.trim()
-      ? 'No mods match that search.'
-      : 'No mods match the current filter.';
+    sizeTotal.textContent = view.sizeTotalText;
+    emptyNote.textContent = view.emptyNote;
     table.classList.toggle('show', rows.length > 0);
     emptyNote.classList.toggle('show', rows.length === 0);
     summaryBar.classList.add('show');
@@ -1112,6 +1098,54 @@
     const hay = [row.name, row.modId, row.version, row.source, row.collectionText]
       .filter(Boolean).join(' ').toLowerCase();
     return q.split(/\s+/).every(term => hay.indexOf(term) !== -1);
+  }
+
+  // Everything render() decides, separated from everything it draws.
+  //
+  // Both render-layer bugs found so far were decision bugs, not drawing bugs:
+  // a column-visibility check reading stale state, and a note that fired for a
+  // format it didn't apply to. Neither needed a browser to catch. Keeping the
+  // decisions here, free of any DOM access, is what makes them testable.
+  //
+  // Takes the full row set plus the control values; returns what should be
+  // shown. render() does nothing but apply the result.
+  function viewState(allRows, opts){
+    const options = opts || {};
+    const search = options.search || '';
+    let rows = allRows || [];
+
+    // "Enabled only" is meaningless when nothing knows its status, which is
+    // the case for Vortex's unfiltered "all installed mods" view.
+    if (options.onlyEnabled && rows.some(r => r.enabled !== null)){
+      rows = rows.filter(r => r.enabled !== false);
+    }
+
+    // Column visibility is decided from the unfiltered set, so searching down
+    // to a single mod with no recorded size doesn't make the column vanish.
+    const unfiltered = rows;
+    rows = rows.filter(r => matchesQuery(r, search));
+
+    // Only MO2 files carry a verified order; only Vortex files carry sizes
+    // and collections. Each column hides where the data doesn't exist.
+    const hasOrder = unfiltered.some(r => typeof r.order === 'number');
+    const hasSize = unfiltered.some(r => typeof r.size === 'number');
+    const hasColl = unfiltered.some(r => r.collectionText);
+
+    // Falling back rather than sorting by a field that isn't there.
+    let sort = options.sort || 'name';
+    if (sort === 'order' && !hasOrder) sort = 'name';
+    if (sort === 'order'){
+      rows = rows.slice().sort((a,b) => a.order - b.order);
+    } else if (sort === 'size'){
+      rows = rows.slice().sort((a,b) => (b.size || 0) - (a.size || 0));
+    }
+
+    const totalBytes = rows.reduce((sum, r) => sum + (typeof r.size === 'number' ? r.size : 0), 0);
+    return {
+      rows, sort, hasOrder, hasSize, hasColl, totalBytes,
+      sizeTotalText: totalBytes > 0 ? '  ·  ' + formatSize(totalBytes) + ' on disk' : '',
+      emptyNote: search.trim() ? 'No mods match that search.' : 'No mods match the current filter.',
+    };
   }
 
   function statusLabel(enabled){

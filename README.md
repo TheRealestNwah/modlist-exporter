@@ -67,8 +67,9 @@ node --test test/*.test.js
 No dependencies and no build step. Because `index.html` is deliberately one
 self-contained file with nothing to import, `test/extract.js` lifts the pure
 (DOM-free) functions out of its `<script>` block and evaluates them:
-`parseMO2`, `parseModlist`, `buildRows`, `diffRows`, `statusLabel` and
-`csvCell`.
+`parseMO2`, `parseModlist`, `buildRows`, `diffRows`, `viewState`,
+`collectionMembership`, `collectionLabel`, `formatSize`, `matchesQuery`,
+`statusLabel` and `csvCell`.
 
 That couples the tests to the file's shape — each of those must stay declared
 at two-space indentation inside the IIFE. If one is renamed or re-indented,
@@ -76,9 +77,22 @@ extraction fails loudly by name rather than silently testing nothing.
 
 The suite covers marker parsing, separator handling, MO2's reversed priority
 order, the Vortex attribute fallbacks, Nexus mod and collection link
-construction (including rejecting a malformed slug), the tri-state
-enabled/unknown status, every diff classification, and the CSV
-formula-injection guard.
+construction (including rejecting a malformed slug), collection membership
+matching, the tri-state enabled/unknown status, every diff classification,
+and the CSV formula-injection guard.
+
+`render()` is deliberately split in two: `viewState()` decides *what* should
+be shown — filtering, sorting, column visibility, totals — and `render()` does
+nothing but draw the result. Every render-layer bug found so far has been a
+decision bug rather than a drawing bug (a column-visibility check reading
+stale state; a note firing for a format it didn't apply to), and neither
+needed a browser to catch. Keeping the decisions DOM-free is what makes them
+testable without adding a dependency or a build step to a single-file
+project.
+
+That leaves the wiring untested — whether a listener is attached, whether an
+element ID is right. Those fail loudly on first load rather than silently
+producing wrong output, which is why this trade is worth making.
 
 One test is skipped unless you have local Vortex backups: if
 `%APPDATA%\Vortex\temp\state_backups_full\` holds two or more state files, it

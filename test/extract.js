@@ -25,6 +25,7 @@ const NAMES = [
   'matchesQuery',
   'collectionMembership',
   'collectionLabel',
+  'viewState',
 ];
 
 function extract() {
