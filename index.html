@@ -606,7 +606,8 @@
 
   function populateProfiles(gameId){
     const allProfiles = Object.entries(parsed.profiles)
-      .filter(([id, p]) => p && p.gameId === gameId);
+      .filter(([id, p]) => p && p.gameId === gameId)
+      .sort((a, b) => (b[1].lastActivated || 0) - (a[1].lastActivated || 0));
 
     profileSelect.innerHTML = '';
     const anyOpt = document.createElement('option');
@@ -614,18 +615,15 @@
     anyOpt.textContent = 'All installed mods (no profile filter)';
     profileSelect.appendChild(anyOpt);
 
-    allProfiles
-      .sort((a,b) => (b[1].lastActivated||0) - (a[1].lastActivated||0))
-      .forEach(([id, p]) => {
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = (p.name || id);
-        profileSelect.appendChild(opt);
-      });
+    allProfiles.forEach(([id, p]) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = (p.name || id);
+      profileSelect.appendChild(opt);
+    });
 
-    if (allProfiles.length){
-      profileSelect.value = allProfiles.sort((a,b) => (b[1].lastActivated||0) - (a[1].lastActivated||0))[0][0];
-    }
+    // Most recently activated profile is the useful default.
+    if (allProfiles.length) profileSelect.value = allProfiles[0][0];
     profileSelect.onchange = refresh;
     refresh();
   }
@@ -675,7 +673,6 @@
       }
       return {
         modId, name, version,
-        fileName: attr.installerChoices ? '' : (attr.fileName || ''),
         enabled, sourceUrl, source: fileSource || '—'
       };
     });
@@ -686,8 +683,7 @@
 
   function render(){
     if (!parsed) return;
-    currentRows = buildRows(parsed, gameSelect.value, profileSelect.value);
-    let rows = currentRows;
+    let rows = buildRows(parsed, gameSelect.value, profileSelect.value);
     if (onlyEnabled.checked && rows.some(r => r.enabled !== null)){
       rows = rows.filter(r => r.enabled !== false);
     }
@@ -1003,11 +999,15 @@
     return currentRows.some(r => typeof r.order === 'number');
   }
 
+  // Plain-text rendering of what changed. Empty for added/removed rows,
+  // which have no before/after to show.
+  function diffDetail(d){
+    return d.changes ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ') : '';
+  }
+
   function diffTextLines(){
     return visibleDiff.map(d => {
-      const detail = d.change === 'changed'
-        ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ')
-        : statusLabel(d.row.enabled);
+      const detail = d.change === 'changed' ? diffDetail(d) : statusLabel(d.row.enabled);
       return '[' + d.change + '] ' + d.row.name + ' — ' + detail;
     });
   }
@@ -1026,10 +1026,7 @@
     if (view === 'diff'){
       const lines = ['Change,Mod,Version,Status,Detail'];
       visibleDiff.forEach(d => {
-        const detail = d.change === 'changed'
-          ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ')
-          : '';
-        lines.push([d.change, d.row.name, d.row.version, statusLabel(d.row.enabled), detail]
+        lines.push([d.change, d.row.name, d.row.version, statusLabel(d.row.enabled), diffDetail(d)]
           .map(csvCell).join(','));
       });
       download(exportBaseName() + '-changes.csv', lines.join('\n'), 'text/csv');
