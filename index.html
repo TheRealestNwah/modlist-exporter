@@ -490,16 +490,18 @@
     render();
   }
 
-  function buildRows(){
-    if (parsed.type === 'mo2'){
+  // Builds the row set for one loaded file. Parameterised on the source so
+  // the diff can build a second file's rows without disturbing the view.
+  function buildRows(source, gameId, profileKey){
+    if (source.type === 'mo2'){
       // modlist.txt runs bottom-to-top relative to MO2's pane, so ranking by
       // descending filePosition reproduces the order shown in MO2, top first.
       const paneRank = new Map();
-      parsed.entries.slice()
+      source.entries.slice()
         .sort((a,b) => b.filePosition - a.filePosition)
         .forEach((entry, i) => paneRank.set(entry, i + 1));
 
-      let rows = parsed.entries.map(entry => ({
+      let rows = source.entries.map(entry => ({
         modId: entry.name, name: entry.name, version: '—',
         enabled: entry.enabled, sourceUrl: null,
         source: entry.unmanaged ? 'unmanaged' : '—',
@@ -509,10 +511,9 @@
       return rows;
     }
 
-    const gameId = gameSelect.value;
-    const profileKey = profileSelect.value;
-    const gameMods = parsed.mods[gameId] || {};
-    const profile = (profileKey && profileKey !== '__all__') ? parsed.profiles[profileKey] : null;
+    const gameMods = (source.mods && source.mods[gameId]) || {};
+    const profile = (profileKey && profileKey !== '__all__' && source.profiles)
+      ? source.profiles[profileKey] : null;
     const modState = profile ? (profile.modState || {}) : null;
 
     let rows = Object.entries(gameMods).map(([modId, mod]) => {
@@ -545,7 +546,7 @@
 
   function render(){
     if (!parsed) return;
-    currentRows = buildRows();
+    currentRows = buildRows(parsed, gameSelect.value, profileSelect.value);
     let rows = currentRows;
     if (onlyEnabled.checked && rows.some(r => r.enabled !== null)){
       rows = rows.filter(r => r.enabled !== false);
@@ -642,6 +643,44 @@
     let v = String(value);
     if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
     return '"' + v.replace(/"/g, '""') + '"';
+  }
+
+  function statusLabel(enabled){
+    return enabled === null || enabled === undefined ? '—' : (enabled ? 'enabled' : 'disabled');
+  }
+
+  // Compares two row sets keyed by modId (which is the mod name for MO2).
+  // Direction is oldest -> newest by file timestamp, so 'added' means the mod
+  // is present in the newer file only.
+  function diffRows(oldRows, newRows){
+    const index = rows => new Map(rows.map(r => [r.modId, r]));
+    const before = index(oldRows), after = index(newRows);
+    const out = [];
+
+    after.forEach((now, id) => {
+      const was = before.get(id);
+      if (!was){ out.push({ change: 'added', row: now }); return; }
+      const changes = [];
+      if (was.version !== now.version){
+        changes.push({ field: 'version', from: was.version, to: now.version });
+      }
+      if (was.enabled !== now.enabled){
+        changes.push({ field: 'status', from: statusLabel(was.enabled), to: statusLabel(now.enabled) });
+      }
+      if (typeof was.order === 'number' && typeof now.order === 'number' && was.order !== now.order){
+        changes.push({ field: 'order', from: was.order, to: now.order });
+      }
+      out.push({ change: changes.length ? 'changed' : 'unchanged', row: now, prev: was, changes });
+    });
+
+    before.forEach((was, id) => {
+      if (!after.has(id)) out.push({ change: 'removed', row: was });
+    });
+
+    const rank = { added: 0, removed: 1, changed: 2, unchanged: 3 };
+    out.sort((x, y) => (rank[x.change] - rank[y.change]) ||
+      x.row.name.localeCompare(y.row.name, undefined, {sensitivity:'base'}));
+    return out;
   }
 
   // currentRows is whatever the table is showing, so exports match the view.
