@@ -223,6 +223,11 @@
     transition: background .15s ease, color .15s ease;
   }
   .view-tabs button.active{ background: var(--accent-dim); color: var(--ink); border-color: var(--accent-dim); }
+  .diff-filters{ display:none; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .diff-filters.show{ display:flex; }
+  .diff-filters .toggle-btn{ padding: 7px 11px; font-size: 12.5px; }
+  .diff-filters .toggle-btn.off{ color: var(--ink-dim); }
+
   .diff-basis{
     display:none;
     margin-top: 14px;
@@ -319,6 +324,13 @@
     <button id="viewDiffBtn">Changes</button>
   </div>
 
+  <div class="diff-filters" id="diffFilters">
+    <label class="toggle-btn"><input type="checkbox" data-change="added" checked> <span data-label="added">added</span></label>
+    <label class="toggle-btn"><input type="checkbox" data-change="removed" checked> <span data-label="removed">removed</span></label>
+    <label class="toggle-btn"><input type="checkbox" data-change="changed" checked> <span data-label="changed">changed</span></label>
+    <label class="toggle-btn"><input type="checkbox" data-change="unchanged"> <span data-label="unchanged">unchanged</span></label>
+  </div>
+
   <div class="diff-basis" id="diffBasis"></div>
 
   <div class="summary-bar" id="summaryBar">
@@ -398,13 +410,16 @@
   const diffTable = document.getElementById('diffTable');
   const diffTableBody = document.getElementById('diffTableBody');
   const countLabel = document.getElementById('countLabel');
+  const diffFilters = document.getElementById('diffFilters');
+  const filterInputs = [...diffFilters.querySelectorAll('input[data-change]')];
 
   let parsed = null; // { type: 'vortex', mods, profiles } | { type: 'mo2', entries: [{name, enabled}] }
   let currentRows = [];
   let primaryFile = null;   // the File behind `parsed`, kept for its timestamp
   let compareSource = null; // second parsed file, same shape as `parsed`
   let compareFile = null;
-  let currentDiff = [];
+  let currentDiff = [];   // every comparison result
+  let visibleDiff = [];   // what the change-type filters actually show
   let view = 'list';        // 'list' | 'diff'
 
   dropzone.addEventListener('click', () => fileInput.click());
@@ -778,7 +793,19 @@
     currentDiff = diffRows(olderRows, newerRows);
     const counts = { added:0, removed:0, changed:0, unchanged:0 };
     currentDiff.forEach(d => counts[d.change]++);
-    const shown = currentDiff.filter(d => d.change !== 'unchanged');
+
+    const active = new Set(filterInputs.filter(i => i.checked).map(i => i.dataset.change));
+    const shown = currentDiff.filter(d => active.has(d.change));
+    visibleDiff = shown;
+
+    // Put the tally on each filter so the counts are visible even when a
+    // change type is switched off.
+    filterInputs.forEach(input => {
+      const kind = input.dataset.change;
+      const span = diffFilters.querySelector('[data-label="' + kind + '"]');
+      if (span) span.textContent = kind + ' (' + counts[kind] + ')';
+      input.closest('.toggle-btn').classList.toggle('off', !input.checked);
+    });
 
     diffTableBody.innerHTML = '';
     shown.forEach(d => {
@@ -831,7 +858,7 @@
       'Comparing ' + olderFile.name + ' (' + fmtDate(olderFile) + ')  →  ' +
         newerFile.name + ' (' + fmtDate(newerFile) + ')',
       counts.added + ' added  ·  ' + counts.removed + ' removed  ·  ' +
-        counts.changed + ' changed  ·  ' + counts.unchanged + ' unchanged (not listed)'
+        counts.changed + ' changed  ·  ' + counts.unchanged + ' unchanged'
     ];
     if (parsed.type === 'vortex' && keyCompare !== keyPrimary){
       const pname = (parsed.profiles && parsed.profiles[keyPrimary] &&
@@ -848,7 +875,15 @@
     diffBasis.classList.add('show');
 
     modCount.textContent = shown.length;
-    countLabel.textContent = shown.length === 1 ? 'change' : 'changes';
+    // 'changes' would be wrong when unchanged rows are being listed too.
+    const listingUnchanged = active.has('unchanged') && counts.unchanged > 0;
+    countLabel.textContent = listingUnchanged
+      ? (shown.length === 1 ? 'row' : 'rows')
+      : (shown.length === 1 ? 'change' : 'changes');
+    const anyDifference = counts.added + counts.removed + counts.changed > 0;
+    emptyNote.textContent = anyDifference
+      ? 'No changes match the current filter.'
+      : 'No differences between these two files.';
     diffTable.classList.toggle('show', shown.length > 0);
     emptyNote.classList.toggle('show', shown.length === 0);
     summaryBar.classList.add('show');
@@ -862,11 +897,12 @@
     if (isDiff){
       table.classList.remove('show');
       controls.classList.remove('show');
-      emptyNote.textContent = 'No differences between these two files.';
+      diffFilters.classList.add('show');
       renderDiff();
     } else {
       diffTable.classList.remove('show');
       diffBasis.classList.remove('show');
+      diffFilters.classList.remove('show');
       controls.classList.add('show');
       countLabel.textContent = 'mods';
       emptyNote.textContent = 'No mods match the current filter.';
@@ -881,6 +917,7 @@
 
   onlyEnabled.addEventListener('change', refresh);
   sortSelect.addEventListener('change', refresh);
+  filterInputs.forEach(i => i.addEventListener('change', () => { if (view === 'diff') renderDiff(); }));
   viewListBtn.addEventListener('click', () => setView('list'));
   viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
 
@@ -967,7 +1004,7 @@
   }
 
   function diffTextLines(){
-    return currentDiff.filter(d => d.change !== 'unchanged').map(d => {
+    return visibleDiff.map(d => {
       const detail = d.change === 'changed'
         ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ')
         : statusLabel(d.row.enabled);
@@ -988,7 +1025,7 @@
   csvBtn.addEventListener('click', () => {
     if (view === 'diff'){
       const lines = ['Change,Mod,Version,Status,Detail'];
-      currentDiff.filter(d => d.change !== 'unchanged').forEach(d => {
+      visibleDiff.forEach(d => {
         const detail = d.change === 'changed'
           ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ')
           : '';

@@ -87,6 +87,11 @@ Direction is decided by each file's timestamp, not the order you load them
 in — the older file is always the baseline, so "added" means a mod appeared
 over time regardless of which one you picked first.
 
+Results can be filtered by change type — added, removed, changed and
+unchanged each toggle independently, and each filter shows its own tally so
+the counts stay visible even when a type is switched off. Unchanged is off
+by default. Exports follow whatever the filter is currently showing.
+
 Both files must come from the same mod manager; comparing a Vortex state
 file against an MO2 `modlist.txt` is refused rather than producing
 nonsense.
