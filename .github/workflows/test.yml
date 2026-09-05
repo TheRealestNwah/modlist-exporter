@@ -1,0 +1,25 @@
+name: Tests
+
+# Runs on every PR into main, and on main itself. Deploys are handled
+# separately by deploy.yml, which only fires on a published release.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # No dependencies to install: the suite uses node:test and lifts the
+      # pure functions straight out of index.html.
+      - run: node --test test/*.test.js
