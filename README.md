@@ -26,7 +26,10 @@ browser, with exports available as CSV, plain text, or clipboard copy.
     or source data)
 - **File freshness check** — flags when the loaded file is more than a
   couple days old, so you don't export a stale list without realizing it
-- Export as CSV, plain `.txt`, or copy straight to clipboard
+- **Compare two snapshots** — load a second file to see what changed between
+  them: added, removed, enabled/disabled, version bumps, and priority moves
+- Export as CSV, plain `.txt`, or copy straight to clipboard (the changes
+  view exports too, as `*-changes.csv` / `*-changes.txt`)
 
 ## Structure
 
@@ -85,6 +88,32 @@ In both cases:
   constructed when the game and mod IDs actually look like IDs, and CSV
   fields that begin with `=`, `+`, `-` or `@` are quote-prefixed so
   spreadsheet apps don't evaluate them as formulas.
+
+## Comparing two snapshots
+
+Load a file, then drop a second one into the compare box that appears below
+the results. The two are matched by mod ID (mod name, for MO2) and reported
+as added, removed, changed or unchanged.
+
+Direction is decided by each file's timestamp, not the order you load them
+in — the older file is always the baseline, so "added" means a mod appeared
+over time regardless of which one you picked first.
+
+Results can be filtered by change type — added, removed, changed and
+unchanged each toggle independently, and each filter shows its own tally so
+the counts stay visible even when a type is switched off. Unchanged is off
+by default. Exports follow whatever the filter is currently showing.
+
+Both files must come from the same mod manager; comparing a Vortex state
+file against an MO2 `modlist.txt` is refused rather than producing
+nonsense.
+
+A caveat specific to Vortex: enabled/disabled state lives on the *profile*,
+so if the profile you're viewing doesn't exist in the other file, that side
+falls back to its full installed-mod list and status can't be compared. In
+that case only additions, removals and version changes are reported, and
+the comparison says so. This matters because treating "unknown" as a change
+would otherwise mark every single mod as modified.
 
 ## Notes on file locations
 
@@ -160,7 +189,7 @@ comparable ordering.
       relative to MO2's pane)
 - [ ] Surface Vortex load order when present in the state file
       (game-extension dependent)
-- [ ] Diff view between two loaded snapshots (what was added/removed/updated)
+- [x] Diff view between two loaded snapshots (what was added/removed/updated)
 - [ ] Folder-watch / auto-refresh via the File System Access API
 
 ## AI disclosure
