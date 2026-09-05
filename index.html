@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vortex Modlist Exporter</title>
+<style>
+  :root{
+    --bg: #16141c;
+    --panel: #1e1b26;
+    --panel-2: #262231;
+    --line: #362f45;
+    --ink: #eae6f5;
+    --ink-dim: #9c93b3;
+    --accent: #8f6bff;
+    --accent-dim: #5c4a99;
+    --good: #5fd68a;
+    --bad: #ff6b6b;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    padding: 32px 20px 80px;
+  }
+  .wrap{ max-width: 880px; margin: 0 auto; }
+
+  header{ margin-bottom: 28px; }
+  .eyebrow{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    margin-bottom: 8px;
+  }
+  h1{
+    font-size: 26px;
+    margin: 0 0 8px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .sub{ color: var(--ink-dim); font-size: 14.5px; line-height: 1.55; max-width: 62ch; }
+  .sub code{ font-family: var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+
+  details.help{
+    margin-top: 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 2px 16px;
+  }
+  details.help summary{
+    cursor: pointer;
+    padding: 12px 0;
+    font-size: 13.5px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  details.help .help-body{
+    padding: 0 0 16px;
+    color: var(--ink-dim);
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+  details.help ul{ margin: 8px 0; padding-left: 20px; }
+  details.help code{ font-family: var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: var(--ink); }
+
+  .dropzone{
+    margin-top: 22px;
+    border: 1.5px dashed var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    padding: 34px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color: var(--accent);
+    background: var(--panel-2);
+  }
+  .dropzone .dz-title{ font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .dropzone .dz-sub{ font-size: 13px; color: var(--ink-dim); font-family: var(--mono); }
+  input[type=file]{ display:none; }
+
+  .status{ margin-top: 14px; font-size: 13.5px; font-family: var(--mono); }
+  .status.err{ color: var(--bad); }
+  .status.ok{ color: var(--good); }
+
+  .freshness{
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .freshness.show{ display: flex; }
+  .freshness.fresh{ background: rgba(95,214,138,0.1); color: var(--good); border: 1px solid rgba(95,214,138,0.25); }
+  .freshness.stale{ background: rgba(255,107,107,0.1); color: var(--bad); border: 1px solid rgba(255,107,107,0.25); }
+
+  .controls{
+    margin-top: 26px;
+    display: none;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .controls.show{ display: flex; }
+  .field{ display: flex; flex-direction: column; gap: 6px; }
+  .field label{ font-size: 11.5px; text-transform: none; color: var(--ink-dim); font-family: var(--mono); }
+  select, .toggle-btn{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: var(--sans);
+    min-width: 200px;
+  }
+  select:focus, .toggle-btn:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .toggle-row{ display:flex; gap: 8px; align-items: center; margin-left: auto; }
+  .toggle-btn{ min-width: unset; cursor: pointer; display:flex; align-items:center; gap:7px; }
+  .toggle-btn input{ accent-color: var(--accent); }
+
+  .summary-bar{
+    margin-top: 20px;
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+  }
+  .summary-bar.show{ display:flex; }
+  .summary-bar .count strong{ color: var(--ink); }
+
+  .export-btns{ display:flex; gap: 8px; }
+  .export-btns button{
+    background: var(--accent-dim);
+    color: var(--ink);
+    border: none;
+    padding: 8px 13px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-family: var(--sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .export-btns button:hover{ background: var(--accent); }
+  .export-btns button.copied{ background: var(--good); color: #12241a; }
+
+  table{
+    margin-top: 14px;
+    width: 100%;
+    border-collapse: collapse;
+    display: none;
+    font-size: 13.5px;
+  }
+  table.show{ display: table; }
+  thead th{
+    text-align: left;
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 11.5px;
+    color: var(--ink-dim);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+  }
+  tbody td{
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  tbody tr:hover{ background: var(--panel); }
+  .mod-name{ font-weight: 500; }
+  .mod-file{ color: var(--ink-dim); font-family: var(--mono); font-size: 11.5px; margin-top: 2px; }
+  .badge{
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    display: inline-block;
+  }
+  .badge.on{ background: rgba(95,214,138,0.15); color: var(--good); }
+  .badge.off{ background: rgba(255,107,107,0.12); color: var(--bad); }
+  .ver, .src{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
+  .src a{ color: var(--accent); text-decoration: none; }
+  .src a:hover{ text-decoration: underline; }
+
+  .empty-note{
+    margin-top: 40px;
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 13px;
+    font-family: var(--mono);
+    display: none;
+  }
+  .empty-note.show{ display:block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">local · read-only · nothing leaves your browser</div>
+    <h1>Vortex Modlist Exporter</h1>
+    <div class="sub">Drop in a Vortex state file and get a clean, exportable list of every mod in a profile — name, version, enabled status, and Nexus link where available. The file is parsed entirely in your browser; it's never uploaded anywhere.</div>
+    <details class="help">
+      <summary>Where do I find the file?</summary>
+      <div class="help-body">
+        Vortex doesn't have a one-click "export modlist" button, but it keeps its own state as JSON that this tool can read directly. Look in your Windows AppData folder for one of these, newest first:
+        <ul>
+          <li><code>%AppData%\Vortex\temp\state_backups_full\manual.json</code> (created via Settings → Workarounds → Backup)</li>
+          <li><code>%AppData%\Vortex\temp\state_backups_full\startup.json</code></li>
+          <li><code>%AppData%\Vortex\temp\state_backups_full\hourly.json</code></li>
+        </ul>
+        Type <code>%AppData%\Vortex\temp\state_backups_full</code> into File Explorer's address bar to jump straight there. Pick whichever file has the most recent "date modified" — that's your current modlist.
+        <br><br>
+        If <code>startup.json</code> and <code>hourly.json</code> both look stale (weeks old, not updating when you install mods), Vortex's automatic backup scheduler may have silently stopped working on your install. The reliable fix: in Vortex, go to <strong>Settings → Workarounds</strong> and use the manual backup option — it writes a fresh <code>manual.json</code> to that same folder immediately, no waiting on the scheduler.
+        <br><br>
+        This tool only reads mod metadata (names, versions, enabled state); it can't see your actual mod files.
+      </div>
+    </details>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dz-title">Click to choose a file, or drag one here</div>
+    <div class="dz-sub">state.json · startup.json · hourly.json</div>
+    <input type="file" id="fileInput" accept=".json,application/json">
+  </div>
+  <div class="status" id="status"></div>
+  <div class="freshness" id="freshness"></div>
+
+  <div class="controls" id="controls">
+    <div class="field">
+      <label for="gameSelect">Game</label>
+      <select id="gameSelect"></select>
+    </div>
+    <div class="field">
+      <label for="profileSelect">Profile</label>
+      <select id="profileSelect"></select>
+    </div>
+    <div class="toggle-row">
+      <label class="toggle-btn"><input type="checkbox" id="onlyEnabled" checked> Enabled mods only</label>
+    </div>
+  </div>
+
+  <div class="summary-bar" id="summaryBar">
+    <div class="count"><strong id="modCount">0</strong> mods</div>
+    <div class="export-btns">
+      <button id="copyBtn">Copy as text</button>
+      <button id="csvBtn">Download CSV</button>
+      <button id="txtBtn">Download .txt</button>
+    </div>
+  </div>
+
+  <table id="modTable">
+    <thead>
+      <tr>
+        <th>Mod</th>
+        <th>Version</th>
+        <th>Status</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody id="modTableBody"></tbody>
+  </table>
+
+  <div class="empty-note" id="emptyNote">No mods match the current filter.</div>
+</div>
+
+<script>
+(function(){
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const statusEl = document.getElementById('status');
+  const freshnessEl = document.getElementById('freshness');
+  const controls = document.getElementById('controls');
+  const gameSelect = document.getElementById('gameSelect');
+  const profileSelect = document.getElementById('profileSelect');
+  const onlyEnabled = document.getElementById('onlyEnabled');
+  const summaryBar = document.getElementById('summaryBar');
+  const modCount = document.getElementById('modCount');
+  const table = document.getElementById('modTable');
+  const tbody = document.getElementById('modTableBody');
+  const emptyNote = document.getElementById('emptyNote');
+  const copyBtn = document.getElementById('copyBtn');
+  const csvBtn = document.getElementById('csvBtn');
+  const txtBtn = document.getElementById('txtBtn');
+
+  let parsed = null; // { mods: {gameId: {modId: modObj}}, profiles: {profileId: profileObj} }
+  let currentRows = [];
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  function setStatus(msg, cls){
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function showFreshness(file){
+    const modified = new Date(file.lastModified);
+    const ageMs = Date.now() - file.lastModified;
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+    const dateStr = modified.toLocaleString();
+
+    freshnessEl.classList.add('show');
+    if (ageDays > 2){
+      const ageDesc = ageDays > 60 ? Math.round(ageDays/30) + ' months' : Math.round(ageDays) + ' days';
+      freshnessEl.className = 'freshness show stale';
+      freshnessEl.textContent = '⚠ This file is from ' + dateStr + ' (' + ageDesc + ' old). If you\'ve installed or changed mods since then, this list won\'t reflect it — see "Where do I find the file?" above, or trigger a manual backup in Vortex (Settings → Workarounds) for a fresh one.';
+    } else {
+      freshnessEl.className = 'freshness show fresh';
+      freshnessEl.textContent = '✓ File is from ' + dateStr + ' — looks current.';
+    }
+  }
+
+  function handleFile(file){
+    setStatus('Reading ' + file.name + ' …');
+    freshnessEl.classList.remove('show');
+    const reader = new FileReader();
+    reader.onload = e => {
+      let json;
+      try{
+        json = JSON.parse(e.target.result);
+      }catch(err){
+        setStatus('That file isn\'t valid JSON — make sure you picked state.json, startup.json, or hourly.json.', 'err');
+        return;
+      }
+      const root = json.persistent ? json.persistent : json; // some backups are stored unwrapped
+      const mods = root && root.mods;
+      const profiles = root && root.profiles;
+      if (!mods || typeof mods !== 'object' || Object.keys(mods).length === 0){
+        const topKeys = json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : '(not an object)';
+        setStatus('No mods found in this file. Top-level keys it does contain: ' + topKeys + '. This is probably the wrong file — the full mod list lives in AppData\\Roaming\\Vortex\\temp\\state_backups_full\\, not the root Vortex folder.', 'err');
+        return;
+      }
+      parsed = { mods, profiles: profiles || {} };
+      setStatus('Loaded ' + file.name + ' ✓', 'ok');
+      showFreshness(file);
+      populateGames();
+    };
+    reader.onerror = () => setStatus('Could not read that file.', 'err');
+    reader.readAsText(file);
+  }
+
+  function populateGames(){
+    const gameIds = Object.keys(parsed.mods).filter(g => parsed.mods[g] && Object.keys(parsed.mods[g]).length > 0);
+    gameSelect.innerHTML = '';
+    gameIds.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g;
+      opt.textContent = g;
+      gameSelect.appendChild(opt);
+    });
+    controls.classList.add('show');
+    gameSelect.onchange = () => populateProfiles(gameSelect.value);
+    populateProfiles(gameSelect.value);
+  }
+
+  function populateProfiles(gameId){
+    const allProfiles = Object.entries(parsed.profiles)
+      .filter(([id, p]) => p && p.gameId === gameId);
+
+    profileSelect.innerHTML = '';
+    const anyOpt = document.createElement('option');
+    anyOpt.value = '__all__';
+    anyOpt.textContent = 'All installed mods (no profile filter)';
+    profileSelect.appendChild(anyOpt);
+
+    allProfiles
+      .sort((a,b) => (b[1].lastActivated||0) - (a[1].lastActivated||0))
+      .forEach(([id, p]) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = (p.name || id);
+        profileSelect.appendChild(opt);
+      });
+
+    if (allProfiles.length){
+      profileSelect.value = allProfiles.sort((a,b) => (b[1].lastActivated||0) - (a[1].lastActivated||0))[0][0];
+    }
+    profileSelect.onchange = render;
+    render();
+  }
+
+  function buildRows(){
+    const gameId = gameSelect.value;
+    const profileKey = profileSelect.value;
+    const gameMods = parsed.mods[gameId] || {};
+    const profile = (profileKey && profileKey !== '__all__') ? parsed.profiles[profileKey] : null;
+    const modState = profile ? (profile.modState || {}) : null;
+
+    let rows = Object.entries(gameMods).map(([modId, mod]) => {
+      const attr = mod.attributes || {};
+      const name = attr.customFileName || attr.name || attr.logicalFileName || modId;
+      const version = attr.version || attr.newestVersion || '—';
+      const nexusModId = attr.modId;
+      const fileSource = attr.source || '';
+      let sourceUrl = null;
+      if (fileSource === 'nexus' && nexusModId){
+        sourceUrl = 'https://www.nexusmods.com/' + gameId + '/mods/' + nexusModId;
+      }
+      let enabled = null;
+      if (modState){
+        enabled = !!(modState[modId] && modState[modId].enabled);
+      }
+      return {
+        modId, name, version,
+        fileName: attr.installerChoices ? '' : (attr.fileName || ''),
+        enabled, sourceUrl, source: fileSource || '—'
+      };
+    });
+
+    rows.sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
+    return rows;
+  }
+
+  function render(){
+    if (!parsed) return;
+    currentRows = buildRows();
+    let rows = currentRows;
+    if (onlyEnabled.checked && rows.some(r => r.enabled !== null)){
+      rows = rows.filter(r => r.enabled !== false);
+    }
+
+    tbody.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+
+      const nameTd = document.createElement('td');
+      nameTd.innerHTML = '<div class="mod-name">' + escapeHtml(r.name) + '</div>' +
+        (r.modId !== r.name ? '<div class="mod-file">' + escapeHtml(r.modId) + '</div>' : '');
+      tr.appendChild(nameTd);
+
+      const verTd = document.createElement('td');
+      verTd.className = 'ver';
+      verTd.textContent = r.version;
+      tr.appendChild(verTd);
+
+      const statTd = document.createElement('td');
+      if (r.enabled === null){
+        statTd.innerHTML = '<span class="ver">—</span>';
+      } else {
+        statTd.innerHTML = '<span class="badge ' + (r.enabled ? 'on':'off') + '">' + (r.enabled ? 'enabled':'disabled') + '</span>';
+      }
+      tr.appendChild(statTd);
+
+      const srcTd = document.createElement('td');
+      srcTd.className = 'src';
+      srcTd.innerHTML = r.sourceUrl ? '<a href="' + r.sourceUrl + '" target="_blank" rel="noopener">' + escapeHtml(r.source) + ' ↗</a>' : escapeHtml(r.source);
+      tr.appendChild(srcTd);
+
+      tbody.appendChild(tr);
+    });
+
+    modCount.textContent = rows.length;
+    table.classList.toggle('show', rows.length > 0);
+    emptyNote.classList.toggle('show', rows.length === 0);
+    summaryBar.classList.add('show');
+    currentRows = rows;
+  }
+
+  onlyEnabled.addEventListener('change', render);
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function download(filename, content, mime){
+    const blob = new Blob([content], {type: mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  csvBtn.addEventListener('click', () => {
+    const header = ['Name','Version','Status','Source','Source URL'];
+    const lines = [header.join(',')];
+    currentRows.forEach(r => {
+      const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
+      const fields = [r.name, r.version, status, r.source, r.sourceUrl || ''];
+      lines.push(fields.map(f => '"' + String(f).replace(/"/g,'""') + '"').join(','));
+    });
+    download('vortex-modlist.csv', lines.join('\n'), 'text/csv');
+  });
+
+  txtBtn.addEventListener('click', () => {
+    const lines = currentRows.map(r => {
+      const status = r.enabled === null ? '' : (r.enabled ? ' [enabled]' : ' [disabled]');
+      return r.name + ' — ' + r.version + status;
+    });
+    download('vortex-modlist.txt', lines.join('\n'), 'text/plain');
+  });
+
+  copyBtn.addEventListener('click', () => {
+    const lines = currentRows.map(r => {
+      const status = r.enabled === null ? '' : (r.enabled ? ' [enabled]' : ' [disabled]');
+      return r.name + ' — ' + r.version + status;
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      copyBtn.textContent = 'Copied ✓';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = 'Copy as text'; copyBtn.classList.remove('copied'); }, 1600);
+    });
+  });
+})();
+</script>
+</body>
+</html>
