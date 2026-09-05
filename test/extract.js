@@ -21,6 +21,8 @@ const NAMES = [
   'diffRows',
   'buildRows',
   'csvCell',
+  'formatSize',
+  'matchesQuery',
 ];
 
 function extract() {

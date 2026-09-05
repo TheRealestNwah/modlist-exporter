@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseMO2, parseModlist, diffRows, buildRows, csvCell } = require('./extract.js');
+const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -224,6 +224,69 @@ test('csvCell: formula-leading characters are neutralised', () => {
 
 test('csvCell: ordinary values are untouched', () => {
   assert.strictEqual(csvCell('Normal Mod'), '"Normal Mod"');
+});
+
+// --------------------------------------------------------------- formatSize
+
+test('formatSize: scales through units', () => {
+  assert.strictEqual(formatSize(512), '512 B');
+  assert.strictEqual(formatSize(1024), '1.0 KB');
+  assert.strictEqual(formatSize(5 * 1024 * 1024), '5.0 MB');
+  assert.strictEqual(formatSize(2.5 * 1024 * 1024 * 1024), '2.5 GB');
+});
+
+test('formatSize: drops the decimal once the number is big enough to not need it', () => {
+  assert.strictEqual(formatSize(150 * 1024 * 1024), '150 MB');
+});
+
+test('formatSize: missing or nonsensical sizes render as a dash', () => {
+  for (const v of [null, undefined, 0, -1, NaN, Infinity, '900']) {
+    assert.strictEqual(formatSize(v), '—', 'failed for ' + String(v));
+  }
+});
+
+// ------------------------------------------------------------- matchesQuery
+
+const row = { name: 'Unofficial Skyrim Patch', modId: 'USSEP-266', version: '4.3.2', source: 'nexus' };
+
+test('matchesQuery: an empty query matches everything', () => {
+  for (const q of ['', '   ', null, undefined]) assert.strictEqual(matchesQuery(row, q), true);
+});
+
+test('matchesQuery: case-insensitive substring over name, id, version and source', () => {
+  assert.strictEqual(matchesQuery(row, 'skyrim'), true);
+  assert.strictEqual(matchesQuery(row, 'SKYRIM'), true);
+  assert.strictEqual(matchesQuery(row, 'ussep'), true);
+  assert.strictEqual(matchesQuery(row, '4.3'), true);
+  assert.strictEqual(matchesQuery(row, 'nexus'), true);
+  assert.strictEqual(matchesQuery(row, 'morrowind'), false);
+});
+
+test('matchesQuery: multiple terms all have to match, in any order', () => {
+  assert.strictEqual(matchesQuery(row, 'unofficial patch'), true);
+  assert.strictEqual(matchesQuery(row, 'patch unofficial'), true);
+  assert.strictEqual(matchesQuery(row, 'unofficial morrowind'), false);
+});
+
+test('matchesQuery: surrounding whitespace is ignored', () => {
+  assert.strictEqual(matchesQuery(row, '  skyrim  '), true);
+});
+
+test('matchesQuery: tolerates rows with missing fields', () => {
+  assert.strictEqual(matchesQuery({ name: 'Solo' }, 'solo'), true);
+  assert.strictEqual(matchesQuery({ name: 'Solo' }, 'nexus'), false);
+});
+
+// ------------------------------------------------- buildRows: size plumbing
+
+test('buildRows: modSize is preferred over fileSize, and absence is null', () => {
+  const rows = buildRows(vortex({
+    both: { attributes: { name: 'Both', modSize: 100, fileSize: 999 } },
+    only: { attributes: { name: 'Only', fileSize: 42 } },
+    none: { attributes: { name: 'None' } },
+  }), 'skyrimse', '__all__');
+  const by = Object.fromEntries(rows.map((r) => [r.name, r.size]));
+  assert.deepStrictEqual(by, { Both: 100, Only: 42, None: null });
 });
 
 // -------------------------------------------------- optional: real backups
