@@ -3,8 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Browse and export your installed mods from your mod manager. Supports Vortex
-and Mod Organizer 2, with more mod managers planned. Runs entirely in your
-browser, with exports available as CSV, plain text, or clipboard copy.
+and Mod Organizer 2. Runs entirely in your browser, with exports available as
+CSV, plain text, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
@@ -71,9 +71,15 @@ node --test test/*.test.js
 No dependencies and no build step. Because `index.html` is deliberately one
 self-contained file with nothing to import, `test/extract.js` lifts the pure
 (DOM-free) functions out of its `<script>` block and evaluates them:
-`parseMO2`, `parseModlist`, `buildRows`, `diffRows`, `viewState`,
-`collectionMembership`, `collectionLabel`, `formatSize`, `matchesQuery`,
-`statusLabel` and `csvCell`.
+`parseMO2`, `parseModlist`, `buildRows`, `viewState`, `diffRows`,
+`indexModsForMatching`, `matchRule`, `collectionMembership`,
+`collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
+`isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
+`formatSize`, `matchesQuery`, `statusLabel` and `csvCell`.
+
+That list is maintained by hand. Adding a helper that existing functions call,
+without adding it here, breaks a lot of tests at once — which is loud, but
+worth knowing about before it happens.
 
 That couples the tests to the file's shape — each of those must stay declared
 at two-space indentation inside the IIFE. If one is renamed or re-indented,
@@ -82,8 +88,10 @@ extraction fails loudly by name rather than silently testing nothing.
 The suite covers marker parsing, separator handling, MO2's reversed priority
 order, the Vortex attribute fallbacks, Nexus mod and collection link
 construction (including rejecting a malformed slug), collection membership
-matching, the tri-state enabled/unknown status, every diff classification,
-and the CSV formula-injection guard.
+matching and uninstalled-member detection, endorsement states, size
+formatting and sorting, the all-games export's per-game profile selection,
+the tri-state enabled/unknown status, every diff classification, and the CSV
+formula-injection guard.
 
 `render()` is deliberately split in two: `viewState()` decides *what* should
 be shown — filtering, sorting, column visibility, totals — and `render()` does
@@ -135,7 +143,9 @@ add a rule of type *tag* matching `*`, alongside the existing `main` branch
 rule. Equivalently, via the API:
 
 ```bash
-gh api -X POST repos/:owner/:repo/environments/github-pages/deployment-branch-policies   -f name='*' -f type=tag
+gh api -X POST \
+  repos/:owner/:repo/environments/github-pages/deployment-branch-policies \
+  -f name='*' -f type=tag
 ```
 
 Worth re-checking if that environment is ever recreated, or if you fork this
@@ -165,14 +175,16 @@ In both cases:
 - The browser's `File.lastModified` timestamp is checked against the current
   time to warn if the snapshot looks stale.
 - Results render into a table with CSV / .txt / clipboard export. Sorting is
-  by name, install size, or — for MO2 files only — priority order. Columns
-  and sort options are hidden where the format carries no such data: MO2
-  files have no sizes, Vortex files have no comparable ordering.
+  by name, install size, or — for MO2 files only — priority order. Every
+  column and sort option hides itself where the format carries no such data:
+  MO2 files have no sizes, collections or endorsement state, and Vortex files
+  have no equivalent of MO2's priority order.
 - Sizes come from Vortex's `modSize` (falling back to `fileSize`), in bytes.
   The CSV export includes both the formatted size and the raw byte count, so
   it stays sortable in a spreadsheet.
-- The search box filters on name, mod ID, version and source. Multiple terms
-  all have to match, in any order.
+- The search box filters on name, mod ID, version, source and collection
+  name — so searching a collection finds its members. Multiple terms all have
+  to match, in any order.
 - Mod names come from mod authors, so they're treated as untrusted: table
   cells are built as DOM text nodes rather than HTML, Nexus links are only
   constructed when the game and mod IDs actually look like IDs, and CSV
@@ -310,8 +322,9 @@ disabled — there's no periodic-backup staleness concern here. It only
 records mod name and enabled state; version numbers and source links aren't
 part of this format, so those columns will show as empty for MO2 files.
 
-Exports are named after the detected format (`vortex-modlist.csv` /
-`mo2-modlist.csv`, and likewise for `.txt`).
+Exports are named after the detected format: `vortex-modlist.csv` /
+`mo2-modlist.csv`, and likewise for `.txt`. The changes view adds
+`-changes`, and the all-games export is `vortex-modlist-all-games.csv`.
 
 #### Priority order in modlist.txt
 
@@ -339,11 +352,16 @@ comparable ordering.
 - [x] Support Mod Organizer 2's modlist export format alongside Vortex's JSON
 - [x] Surface MO2's priority order (verified: the file is stored reversed
       relative to MO2's pane)
-- [x] Attribute mods to the collection they were installed from
+- [x] Diff view between two loaded snapshots (what was added/removed/updated)
+- [x] Search, sort, and per-mod install sizes
+- [x] Attribute mods to the collection they were installed from, and report
+      collection members that aren't installed
+- [x] Endorsement status, with a filter for mods not yet endorsed
+- [x] Export every Vortex game at once, in one CSV
 - [ ] Surface Vortex load order when present in the state file
       (game-extension dependent)
-- [x] Diff view between two loaded snapshots (what was added/removed/updated)
 - [ ] Folder-watch / auto-refresh via the File System Access API
+- [ ] Markdown / BBCode export, for sharing a load order on a forum
 
 ## AI disclosure
 
@@ -357,7 +375,11 @@ the project owner.
 ## Contributing
 
 Issues and PRs welcome. Since this is a single HTML file, most changes can be
-tested by just opening `index.html` in a browser after editing.
+tried by just opening `index.html` in a browser after editing.
+
+Please run the tests as well — `node --test test/*.test.js`, no install
+needed. They also run automatically on every pull request, and `main`
+requires them to pass.
 
 ## License
 
