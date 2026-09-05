@@ -44,6 +44,18 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
+## Releasing
+
+`main` holds finished work that hasn't shipped yet — pushing to it does not
+change the live site. The GitHub Pages deploy runs only when a release is
+**published** on GitHub, and it deploys the commit that release's tag points
+at.
+
+So the flow is: merge to `main` freely, then publish a release when you want
+those changes live. Pushing a bare tag isn't enough — the release itself has
+to be published. There's a manual "Run workflow" button on the Actions tab if
+you ever need to redeploy without cutting a release.
+
 ## How it works
 
 The tool detects the format automatically based on file content, not

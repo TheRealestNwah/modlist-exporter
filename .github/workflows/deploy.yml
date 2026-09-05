@@ -1,8 +1,17 @@
 name: Deploy to GitHub Pages
 
+# Deploys on a published release, NOT on every push to main.
+#
+# This keeps `main` as "finished work that hasn't shipped yet" rather than
+# "whatever is currently live". Merge features to main freely; the live site
+# only changes when you publish a release on GitHub.
+#
+# Note that pushing a bare tag does not deploy — the release has to actually
+# be published. Use the Actions tab's "Run workflow" button (workflow_dispatch)
+# if you ever need to redeploy the current main without cutting a release.
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -21,10 +30,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # On a release event this resolves to the commit the tag points at,
+      # so the deployed site is exactly the released code.
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
         with:
-          enablement: true      
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
