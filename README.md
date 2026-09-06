@@ -48,7 +48,9 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   Fallout 3 / New Vegas terminal pair, picked in the header and remembered
   per browser
 - **All-games export** — every Vortex game in one CSV with a `Game` column,
-  for when you want the whole setup rather than one game at a time
+  for when you want the whole setup rather than one game at a time, with a
+  per-game picker for when you want three of your five games rather than all
+  of them
 
 ## Structure
 
@@ -97,6 +99,7 @@ functions it lifts:
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
+`allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `themeIds`,
@@ -306,6 +309,24 @@ The **All games CSV** button appears when a Vortex file contains more than one
 game. It writes one row per mod across every game, with a `Game` column, fixed
 columns so the sheet stays rectangular, and both the formatted size and the raw
 byte count.
+
+**Choose games** opens a checkbox per game — everything ticked by default, so
+the whole-file export stays a single click and narrowing it is the extra step
+rather than the default one. The button then says what it will actually do
+(*3 games CSV*), because "All games CSV" would be a lie about the file you are
+about to get. A Vortex install picks up games you tried once and abandoned, and
+their mods are just noise in a sheet about the two games you actually play.
+
+The selection is always written in the file's own game order rather than the
+order the boxes were ticked, so exporting the same games twice produces the
+same sheet. The filename follows the selection too — a full selection stays
+`vortex-modlist-all-games.csv`, up to three games are named
+(`vortex-modlist-skyrimse-fallout4.csv`), and anything larger is
+`vortex-modlist-selected-games.csv` — so two different exports from one file
+don't collide in the downloads folder. Game ids come out of the state file, so
+only plain slugs are allowed into a filename; anything else falls back to the
+generic name rather than being sanitised into something that no longer says
+what it holds.
 
 Deliberately one flat sheet rather than a tab per game: a `Game` column can be
 filtered, sorted and pivoted in any spreadsheet app, which answers "what's my

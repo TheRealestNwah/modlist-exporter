@@ -34,6 +34,7 @@ const NAMES = [
   'defaultProfileFor',
   'gamesWithMods',
   'allGamesRows',
+  'allGamesFileName',
   'diffDetail',
   'mdCell',
   'bbSafe',

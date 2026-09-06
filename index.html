@@ -236,6 +236,50 @@
   }
   .export-btns button:hover{ background: var(--accent); }
   .export-btns button.copied{ background: var(--good); color: var(--on-good); }
+  .export-btns button[disabled]{ opacity: .5; cursor: not-allowed; }
+  .export-btns button[disabled]:hover{ background: var(--accent-dim); }
+
+  /* Opens in the flow under the summary bar rather than floating over it: a
+     popover would need positioning, a z-index and dismiss handling in seven
+     themes, and this needs none of that to be reachable by keyboard. It is
+     built from the same tokens as the notes below the table, so a theme that
+     never mentions it still gets it right. */
+  .game-picker{
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-panel);
+    background: var(--panel);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+  }
+  .game-picker-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .game-picker-actions{ display: flex; gap: 12px; }
+  .picker-link{
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .game-picker-list{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px 16px;
+  }
+  .game-pick{ display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .game-pick input{ accent-color: var(--accent); }
+  .game-pick .count{ color: var(--ink-dim); opacity: .75; }
 
   table{
     margin-top: 14px;
@@ -997,8 +1041,20 @@
       <button id="copyBtn">Copy as text</button>
       <button id="csvBtn">Download CSV</button>
       <button id="txtBtn">Download .txt</button>
+      <button id="pickGamesBtn" aria-expanded="false" aria-controls="gamePicker" title="Choose which games the bulk export covers">Choose games</button>
       <button id="allGamesBtn" title="Every game in one CSV, with a Game column">All games CSV</button>
     </div>
+  </div>
+
+  <div class="game-picker" id="gamePicker" hidden>
+    <div class="game-picker-head">
+      <span id="gamePickerSummary">Games in the bulk export</span>
+      <span class="game-picker-actions">
+        <button type="button" class="picker-link" id="gamePickAll">Select all</button>
+        <button type="button" class="picker-link" id="gamePickNone">Select none</button>
+      </span>
+    </div>
+    <div class="game-picker-list" id="gamePickerList"></div>
   </div>
 
   <div class="table-scroll">
@@ -1088,6 +1144,12 @@
   const notEndorsedField = document.getElementById('notEndorsedField');
   const missingNote = document.getElementById('missingNote');
   const allGamesBtn = document.getElementById('allGamesBtn');
+  const pickGamesBtn = document.getElementById('pickGamesBtn');
+  const gamePicker = document.getElementById('gamePicker');
+  const gamePickerList = document.getElementById('gamePickerList');
+  const gamePickerSummary = document.getElementById('gamePickerSummary');
+  const gamePickAll = document.getElementById('gamePickAll');
+  const gamePickNone = document.getElementById('gamePickNone');
   const diffFilters = document.getElementById('diffFilters');
   const filterInputs = [...diffFilters.querySelectorAll('input[data-change]')];
 
@@ -1099,6 +1161,7 @@
   let currentDiff = [];   // every comparison result
   let visibleDiff = [];   // what the change-type filters actually show
   let view = 'list';        // 'list' | 'diff'
+  let selectedGames = [];   // games the bulk export covers, in file order
 
   // Both zones are divs driving a display:none file input, so neither was
   // reachable by keyboard: the div was never in the tab order and the input
@@ -1330,8 +1393,68 @@
       gameSelect.appendChild(opt);
     });
     controls.classList.add('show');
+    buildGamePicker(gameIds);
     gameSelect.onchange = () => populateProfiles(gameSelect.value);
     populateProfiles(gameSelect.value);
+  }
+
+  // One checkbox per game, everything ticked -- so the bulk export is still
+  // one click for the whole file, and narrowing it is the extra step rather
+  // than the default one.
+  function buildGamePicker(gameIds){
+    selectedGames = gameIds.slice();
+    gamePickerList.innerHTML = '';
+    gameIds.forEach(g => {
+      const label = document.createElement('label');
+      label.className = 'game-pick';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = true;
+      box.value = g;
+      box.addEventListener('change', readGamePicks);
+      const name = document.createElement('span');
+      name.textContent = g;
+      const count = document.createElement('span');
+      count.className = 'count';
+      const n = Object.keys(parsed.mods[g] || {}).length;
+      count.textContent = '(' + n + ')';
+      count.title = n + ' mods installed, before any filter';
+      label.append(box, name, count);
+      gamePickerList.appendChild(label);
+    });
+    updateBulkExport();
+  }
+
+  // Read the boxes rather than tracking clicks, so the selection stays in the
+  // file's own order however it was arrived at -- two exports of the same
+  // games then produce the same sheet.
+  function readGamePicks(){
+    selectedGames = [...gamePickerList.querySelectorAll('input:checked')].map(i => i.value);
+    updateBulkExport();
+  }
+
+  // The button says what it will actually do: with a selection made, "All
+  // games CSV" would be a lie about the file you are about to get.
+  function updateBulkExport(){
+    const total = gamesWithMods(parsed).length;
+    const n = selectedGames.length;
+    allGamesBtn.disabled = n === 0;
+    allGamesBtn.textContent = n === total ? 'All games CSV'
+      : n === 1 ? '1 game CSV' : n + ' games CSV';
+    gamePickerSummary.textContent = n === total
+      ? 'All ' + total + ' games in the bulk export'
+      : n + ' of ' + total + ' games in the bulk export';
+  }
+
+  function showBulkExport(on){
+    allGamesBtn.style.display = on ? '' : 'none';
+    pickGamesBtn.style.display = on ? '' : 'none';
+    if (!on) setGamePickerOpen(false);
+  }
+
+  function setGamePickerOpen(open){
+    gamePicker.hidden = !open;
+    pickGamesBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function populateMO2(){
@@ -1454,7 +1577,7 @@
     table.classList.toggle('no-endo', !view.hasEndo);
     notEndorsedField.style.display = view.hasEndo ? '' : 'none';
     // Only worth offering when there's more than one game to combine.
-    allGamesBtn.style.display = gamesWithMods(parsed).length > 1 ? '' : 'none';
+    showBulkExport(gamesWithMods(parsed).length > 1);
     sortOrderOption.hidden = !view.hasOrder;
     // viewState falls back when the chosen sort has no data behind it; reflect
     // that back into the control so the two don't disagree.
@@ -1723,7 +1846,7 @@
       diffFilters.classList.add('show');
       sizeTotal.textContent = '';
       missingNote.classList.remove('show');
-      allGamesBtn.style.display = 'none';
+      showBulkExport(false);
       renderDiff();
     } else {
       diffTable.classList.remove('show');
@@ -2119,15 +2242,36 @@
   // Every game flattened into one row set, each row tagged with its game.
   // The same view filters are applied per game, so the export matches what
   // you'd see if you stepped through each game in turn.
+  //
+  // `opts.games` narrows it to a chosen subset; omitting it means every game,
+  // which is what the export did before there was anything to choose. The
+  // order is always the file's own, not the order boxes were ticked in, so
+  // two exports of the same selection come out identical.
   function allGamesRows(source, opts){
     const out = [];
+    const wanted = opts && Array.isArray(opts.games) ? new Set(opts.games) : null;
     gamesWithMods(source).forEach(gameId => {
+      if (wanted && !wanted.has(gameId)) return;
       const rows = buildRows(source, gameId, defaultProfileFor(source, gameId));
       viewState(rows, opts).rows.forEach(r => {
         out.push(Object.assign({ game: gameId }, r));
       });
     });
     return out;
+  }
+
+  // Names the bulk export after what is actually in it, so exporting two
+  // different selections from one file doesn't leave two downloads fighting
+  // over the same name. A full selection keeps the original name. Game ids
+  // come out of the state file, so only plain slugs are allowed to reach a
+  // filename -- anything else falls back rather than being sanitised into
+  // something that no longer says which games it holds.
+  function allGamesFileName(selected, total){
+    const list = selected || [];
+    if (!list.length || list.length === total) return 'vortex-modlist-all-games.csv';
+    const named = list.length <= 3 && list.every(g => /^[a-z0-9_-]+$/i.test(String(g)));
+    return named ? 'vortex-modlist-' + list.join('-') + '.csv'
+                 : 'vortex-modlist-selected-games.csv';
   }
 
   function statusLabel(enabled){
@@ -2233,12 +2377,23 @@
     download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
   });
 
+  pickGamesBtn.addEventListener('click', () => setGamePickerOpen(gamePicker.hidden));
+  gamePickAll.addEventListener('click', () => setAllGamePicks(true));
+  gamePickNone.addEventListener('click', () => setAllGamePicks(false));
+
+  function setAllGamePicks(on){
+    gamePickerList.querySelectorAll('input').forEach(b => { b.checked = on; });
+    readGamePicks();
+  }
+
   allGamesBtn.addEventListener('click', () => {
+    if (!selectedGames.length) return;
     const rows = allGamesRows(parsed, {
       onlyEnabled: onlyEnabled.checked,
       notEndorsedOnly: notEndorsed.checked,
       search: searchInput.value,
       sort: sortSelect.value,
+      games: selectedGames,
     });
     // Fixed columns regardless of what each game happens to carry, so the
     // sheet stays rectangular and sortable.
@@ -2253,7 +2408,7 @@
         r.source, r.sourceUrl || '',
       ].map(csvCell).join(','));
     });
-    download('vortex-modlist-all-games.csv', lines.join('\n'), 'text/csv');
+    download(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines.join('\n'), 'text/csv');
   });
 
   // BBCode has no file extension anyone agrees on, and it is pasted into a
