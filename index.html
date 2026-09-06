@@ -1247,10 +1247,12 @@
   // The boot script may already have set this from storage; normalise it.
   applyTheme(document.documentElement.getAttribute('data-theme'));
 
-  function setStatus(msg, cls){
-    statusEl.textContent = msg;
-    statusEl.className = 'status' + (cls ? ' ' + cls : '');
+  // The load line and the compare line are the same control in two places.
+  function writeStatus(el, msg, cls){
+    el.textContent = msg;
+    el.className = 'status' + (cls ? ' ' + cls : '');
   }
+  function setStatus(msg, cls){ writeStatus(statusEl, msg, cls); }
 
   function showFreshness(file, staleMessage){
     const modified = new Date(file.lastModified);
@@ -1345,10 +1347,7 @@
     reader.readAsText(file);
   }
 
-  function setCompareStatus(msg, cls){
-    compareStatus.textContent = msg;
-    compareStatus.className = 'status' + (cls ? ' ' + cls : '');
-  }
+  function setCompareStatus(msg, cls){ writeStatus(compareStatus, msg, cls); }
 
   function handleFile(file){
     setStatus('Reading ' + file.name + ' …');
@@ -1363,7 +1362,8 @@
       currentDiff = [];
       setCompareStatus('');
       viewTabs.classList.remove('show');
-      view = 'list';
+      // The populate* call below renders; this only resets the chrome.
+      applyViewChrome(false);
 
       parsed = res.source;
       primaryFile = file;
@@ -1593,6 +1593,17 @@
     return span;
   }
 
+  // Both views finish by saying how many rows there are, showing the table if
+  // there are any and the empty note if there are not. Only the table element,
+  // the count and the wording of the note differ.
+  function showResults(tableEl, count, emptyText){
+    modCount.textContent = count;
+    emptyNote.textContent = emptyText;
+    tableEl.classList.toggle('show', count > 0);
+    emptyNote.classList.toggle('show', count === 0);
+    summaryBar.classList.add('show');
+  }
+
   function render(){
     if (!parsed) return;
 
@@ -1680,12 +1691,8 @@
       tbody.appendChild(tr);
     });
 
-    modCount.textContent = rows.length;
     sizeTotal.textContent = view.sizeTotalText;
-    emptyNote.textContent = view.emptyNote;
-    table.classList.toggle('show', rows.length > 0);
-    emptyNote.classList.toggle('show', rows.length === 0);
-    summaryBar.classList.add('show');
+    showResults(table, rows.length, view.emptyNote);
     currentRows = rows;
 
     renderMissingMembers();
@@ -1828,24 +1835,25 @@
     });
     diffBasis.classList.add('show');
 
-    modCount.textContent = shown.length;
     // 'changes' would be wrong when unchanged rows are being listed too.
     const listingUnchanged = active.has('unchanged') && counts.unchanged > 0;
     countLabel.textContent = listingUnchanged
       ? (shown.length === 1 ? 'row' : 'rows')
       : (shown.length === 1 ? 'change' : 'changes');
     const anyDifference = counts.added + counts.removed + counts.changed > 0;
-    emptyNote.textContent = anyDifference
+    showResults(diffTable, shown.length, anyDifference
       ? 'No changes match the current filter.'
-      : 'No differences between these two files.';
-    diffTable.classList.toggle('show', shown.length > 0);
-    emptyNote.classList.toggle('show', shown.length === 0);
-    summaryBar.classList.add('show');
+      : 'No differences between these two files.');
   }
 
-  function setView(v){
-    view = v;
-    const isDiff = v === 'diff';
+  // Everything a view owns except drawing it: which tab is lit, which tables
+  // and controls belong on screen, and what the summary bar counts. Split out
+  // because loading a new file also has to reset all of this, and it used to
+  // do it by assigning `view` and hoping -- which left "4 changes" over a mod
+  // list, and the changes tab still lit, whenever a file was dropped while
+  // the comparison was open.
+  function applyViewChrome(isDiff){
+    view = isDiff ? 'diff' : 'list';
     viewListBtn.classList.toggle('active', !isDiff);
     viewDiffBtn.classList.toggle('active', isDiff);
     if (isDiff){
@@ -1855,7 +1863,6 @@
       sizeTotal.textContent = '';
       missingNote.classList.remove('show');
       showBulkExport(false);
-      renderDiff();
     } else {
       diffTable.classList.remove('show');
       diffBasis.classList.remove('show');
@@ -1863,8 +1870,12 @@
       controls.classList.add('show');
       countLabel.textContent = 'mods';
       emptyNote.textContent = 'No mods match the current filter.';
-      render();
     }
+  }
+
+  function setView(v){
+    applyViewChrome(v === 'diff');
+    refresh();
   }
 
   // Route re-renders through the active view.
@@ -1884,6 +1895,15 @@
 
   function exportBaseName(){
     return (parsed && parsed.type === 'mo2') ? 'mo2-modlist' : 'vortex-modlist';
+  }
+
+  // Exports of the changes view are named for it, whatever their format.
+  function exportName(ext){
+    return exportBaseName() + (view === 'diff' ? '-changes' : '') + ext;
+  }
+
+  function downloadCsv(filename, lines){
+    download(filename, lines.join('\n'), 'text/csv');
   }
 
   function download(filename, content, mime){
@@ -2363,7 +2383,7 @@
         lines.push([d.change, d.row.name, d.row.version, statusLabel(d.row.enabled), diffDetail(d)]
           .map(csvCell).join(','));
       });
-      download(exportBaseName() + '-changes.csv', lines.join('\n'), 'text/csv');
+      downloadCsv(exportName('.csv'), lines);
       return;
     }
     const { order: withOrder, size: withSize, coll: withColl, endo: withEndo } = columnsIn(currentRows);
@@ -2381,7 +2401,7 @@
           [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
-    download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
+    downloadCsv(exportName('.csv'), lines);
   });
 
   bulkBtn.addEventListener('click', () => setGamePickerOpen(gamePicker.hidden));
@@ -2421,7 +2441,7 @@
       ].map(csvCell).join(','));
     });
     setGamePickerOpen(false);
-    download(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines.join('\n'), 'text/csv');
+    downloadCsv(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines);
   });
 
   // BBCode has no file extension anyone agrees on, and it is pasted into a
@@ -2450,7 +2470,7 @@
   updateShareLabels();
 
   txtBtn.addEventListener('click', () => {
-    download(exportBaseName() + (view === 'diff' ? '-changes' : '') + SHARE_EXT[shareFormat.value],
+    download(exportName(SHARE_EXT[shareFormat.value]),
       shareLines().join('\n'), SHARE_MIME[shareFormat.value]);
   });
 
