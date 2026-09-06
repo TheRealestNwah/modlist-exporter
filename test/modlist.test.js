@@ -9,7 +9,8 @@ const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matche
         collectionMembership, collectionLabel, viewState,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
         defaultProfileFor, gamesWithMods, allGamesRows,
-        installedAt, installedLabel, nexusPageCounts, allGamesFileName,
+        installedAt, installedLabel, nexusPageCounts,
+        loadOrderFor, gamesWithLoadOrder, loadOrderNote, allGamesFileName,
         columnsIn, csvStatus, statusLabel,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
@@ -602,6 +603,96 @@ test('viewState: the not-endorsed filter keeps only undecided mods', () => {
 test('viewState: hasEndo reflects whether any endorsement data exists', () => {
   assert.strictEqual(viewState([V('A', { endorsed: 'Undecided' })], {}).hasEndo, true);
   assert.strictEqual(viewState([V('A')], {}).hasEndo, false);
+});
+
+// --------------------------------------------------------------- load order
+
+// A plugin is a file inside a mod; one mod can ship several or none. The load
+// order is therefore its own list, not a column on the mod list, and these
+// entries stand alone -- Vortex records a name and enabled flag for each.
+const withOrder = (loadOrder, profiles) => ({
+  type: 'vortex',
+  mods: { morrowind: { a: { attributes: { name: 'A' } } } },
+  profiles: profiles || { pm: { gameId: 'morrowind', name: 'Default', lastActivated: 9 } },
+  loadOrder,
+});
+
+test('loadOrderFor: numbers plugins from 1 in file order', () => {
+  const lo = loadOrderFor(withOrder({ pm: [
+    { name: 'Morrowind.esm', enabled: true },
+    { name: 'Tribunal.esm', enabled: false },
+  ] }), 'morrowind', '__all__');
+  assert.deepStrictEqual(lo, [
+    { position: 1, name: 'Morrowind.esm', enabled: true },
+    { position: 2, name: 'Tribunal.esm', enabled: false },
+  ]);
+});
+
+test('loadOrderFor: falls back to id when an entry has no name', () => {
+  const lo = loadOrderFor(withOrder({ pm: [{ id: 'Thing.esp', enabled: true }] }), 'morrowind', '__all__');
+  assert.strictEqual(lo[0].name, 'Thing.esp');
+});
+
+test('loadOrderFor: entries with neither name nor id are dropped', () => {
+  const lo = loadOrderFor(withOrder({ pm: [{ enabled: true }, { name: 'Real.esp' }] }), 'morrowind', '__all__');
+  assert.deepStrictEqual(lo.map((e) => e.name), ['Real.esp']);
+  assert.strictEqual(lo[0].position, 1, 'numbering restarts after a dropped entry');
+});
+
+test('loadOrderFor: a missing enabled flag reads as disabled, not as unknown', () => {
+  // Unlike a mod's status, a plugin is either in the order or it is not.
+  assert.strictEqual(loadOrderFor(withOrder({ pm: [{ name: 'X.esp' }] }), 'morrowind', '__all__')[0].enabled, false);
+});
+
+test('loadOrderFor: uses the named profile when it has an order', () => {
+  const src = withOrder(
+    { pm: [{ name: 'FromDefault.esp' }], other: [{ name: 'FromOther.esp' }] },
+    { pm: { gameId: 'morrowind', lastActivated: 9 }, other: { gameId: 'morrowind', lastActivated: 1 } });
+  assert.strictEqual(loadOrderFor(src, 'morrowind', 'other')[0].name, 'FromOther.esp');
+});
+
+test('loadOrderFor: with no profile chosen, falls back to the game default', () => {
+  const src = withOrder(
+    { pm: [{ name: 'FromDefault.esp' }] },
+    { pm: { gameId: 'morrowind', lastActivated: 9 }, other: { gameId: 'morrowind', lastActivated: 1 } });
+  assert.strictEqual(loadOrderFor(src, 'morrowind', '__all__')[0].name, 'FromDefault.esp');
+});
+
+test('loadOrderFor: a game Vortex recorded nothing for yields an empty list', () => {
+  assert.deepStrictEqual(loadOrderFor(withOrder({}), 'morrowind', '__all__'), []);
+  assert.deepStrictEqual(loadOrderFor(withOrder({ pm: 'not an array' }), 'morrowind', '__all__'), []);
+});
+
+test('loadOrderFor: an MO2 file has no plugin order at all', () => {
+  assert.deepStrictEqual(loadOrderFor({ type: 'mo2', entries: [{ name: 'A' }] }, null, null), []);
+  assert.deepStrictEqual(loadOrderFor(null, null, null), []);
+});
+
+test('gamesWithLoadOrder: lists only games that actually have one', () => {
+  const src = {
+    type: 'vortex',
+    mods: { morrowind: { a: {} }, skyrimse: { b: {} } },
+    profiles: { pm: { gameId: 'morrowind', lastActivated: 9 }, ps: { gameId: 'skyrimse', lastActivated: 9 } },
+    loadOrder: { pm: [{ name: 'Morrowind.esm' }] },
+  };
+  assert.deepStrictEqual(gamesWithLoadOrder(src), ['morrowind']);
+});
+
+test('loadOrderNote: explains the gap belongs to Vortex, not to the file', () => {
+  const note = loadOrderNote('skyrimse', []);
+  assert.match(note, /skyrimse/);
+  assert.match(note, /extension/);
+});
+
+test('loadOrderNote: names the games that do have one, excluding this one', () => {
+  const note = loadOrderNote('skyrimse', ['morrowind', 'oblivionremastered', 'skyrimse']);
+  assert.match(note, /morrowind and oblivionremastered/);
+  // The game being asked about must not be listed as an alternative to itself.
+  assert.ok(!/for morrowind, oblivionremastered and skyrimse/.test(note));
+});
+
+test('loadOrderNote: says nothing extra when no game in the file has one', () => {
+  assert.ok(!/In this file/.test(loadOrderNote('skyrimse', [])));
 });
 
 // ------------------------------------------------------------ install date

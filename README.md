@@ -43,6 +43,9 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   `modlist.txt` records no sizes)
 - **File freshness check** — flags when the loaded file is more than a
   couple days old, so you don't export a stale list without realizing it
+- **Load order** — a Vortex game's plugin load order as its own list, in the
+  numbered form people are asked to post when something breaks. Exports as
+  plain text, Markdown, BBCode or CSV
 - **Compare two snapshots** — load a second file to see what changed between
   them: added, removed, enabled/disabled, version bumps, and priority moves
 - Export as CSV, plain `.txt`, or copy straight to clipboard (the changes
@@ -108,8 +111,8 @@ functions it lifts:
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `installedAt`,
-`installedLabel`, `nexusPageCounts`, `themeIds`, `resolveTheme` and
-`themeMeta`.
+`installedLabel`, `nexusPageCounts`, `loadOrderFor`, `gamesWithLoadOrder`,
+`loadOrderNote`, `themeIds`, `resolveTheme` and `themeMeta`.
 
 That list is maintained by hand, and forgetting to add a newly extracted
 helper to it broke the suite three separate times — each time as a wall of
@@ -400,6 +403,37 @@ ones still waiting on you — which for a large setup is usually most of them.
 *Abstained*, because that's a decision you already made, and mods with no
 endorsement state at all, which are the ones that didn't come from Nexus and
 can't be endorsed.
+
+## Load order
+
+A third view, next to the mod list and the changes view, showing the plugin
+load order for the selected Vortex game and profile.
+
+**What it is for.** "Post your load order" is the first thing asked in almost
+any modding support thread, because plugin order decides which mod's changes
+win. The mod list is not that list and is not what gets asked for. The plain
+text export is the numbered form people expect; Markdown and BBCode are there
+for wikis and forums.
+
+**Why it is a separate list rather than a column.** A plugin is a file inside
+a mod. One mod can ship several plugins or none, so the two do not line up
+row for row — in one real profile, 20 of 39 mods contribute no plugin at all.
+Trying to show load order as a column on the mod list means inventing an
+answer for those. Kept separate, no such question arises: Vortex records a
+name and an enabled flag for every entry, so nothing has to be matched back
+to a mod.
+
+**When Vortex has not recorded one.** This is the common case, not an error.
+Vortex only stores a load order for games whose extension provides one —
+mostly the Bethesda titles. When the selected game has none, the view says so
+in plain language and names the games in the same file that do have one,
+because "this tool is broken" and "Vortex only records this for some games"
+look identical otherwise. The tab itself is hidden for MO2 files, whose
+`modlist.txt` contains no plugins at all and never could.
+
+Note this is a different thing from MO2's priority order, which is about mods
+overwriting each other rather than plugins loading in sequence. The two are
+never shown at once, since no file carries both.
 
 ## Comparing two snapshots
 
