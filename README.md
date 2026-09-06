@@ -8,7 +8,7 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-![The mod list view in the Vortex theme: a Skyrim Special Edition profile showing the theme picker, search and sort controls, per-mod install sizes with a disk total, collection membership, endorsement status, enabled/disabled state, and Nexus links](docs/screenshot.png)
+![The mod list view in the Midnight theme: a Skyrim Special Edition profile of ten mods, showing the theme picker, search and sort controls, per-mod install sizes with a 2.8 GB disk total, install dates, collection membership, endorsement status, enabled status, links out to Nexus, and a note that one mod listed by a collection is not installed](docs/screenshot.png)
 
 <sub>Example data — not a real load order.</sub>
 
@@ -112,7 +112,7 @@ for the one that defines `parseModlist()` rather than by position. The
 functions it lifts:
 `parseMO2`, `parseModlist`, `buildRows`, `viewState`, `diffRows`,
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
-`collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
+`collectionLabel`, `availableViews`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `columnsIn`, `csvStatus`, `defaultProfileFor`,
 `gamesWithMods`, `allGamesRows`,
 `allGamesFileName`,
@@ -434,7 +434,10 @@ can't be endorsed.
 ## Load order
 
 A third view, next to the mod list and the changes view, showing the plugin
-load order for the selected Vortex game and profile.
+load order for the selected Vortex game and profile. The tabs appear as soon
+as there is somewhere to go: a Vortex file offers Load order on its own, and
+Changes appears once a second file is loaded to compare against. An MO2
+`modlist.txt` has no plugins in it, so it offers no load order tab at all.
 
 **What it is for.** "Post your load order" is the first thing asked in almost
 any modding support thread, because plugin order decides which mod's changes

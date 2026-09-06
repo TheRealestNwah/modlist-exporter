@@ -36,6 +36,7 @@ const NAMES = [
   'collectionMembership',
   'collectionLabel',
   'viewState',
+  'availableViews',
   'missingCollectionMembers',
   'endorsementLabel',
   'isUnendorsed',

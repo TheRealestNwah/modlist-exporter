@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
-        collectionMembership, collectionLabel, viewState,
+        collectionMembership, collectionLabel, viewState, availableViews,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
         defaultProfileFor, gamesWithMods, allGamesRows,
         installedAt, installedLabel, nexusPageCounts,
@@ -1271,4 +1271,26 @@ test('real Vortex backups on this machine parse and diff', {
     const ids = new Set(a.concat(b).map((r) => r.modId));
     assert.strictEqual(d.length, ids.size);
   }
+});
+
+// --- which views a loaded file can offer ---------------------------------
+// The tab bar was shown only when a comparison file was loaded, which left the
+// load order view unreachable for anyone who never used the diff.
+
+test('a Vortex file offers the load order tab on its own', () => {
+  assert.deepStrictEqual(availableViews('vortex', false), { diff: false, order: true });
+});
+
+test('an MO2 file offers no load order, because modlist.txt has no plugins', () => {
+  assert.deepStrictEqual(availableViews('mo2', false), { diff: false, order: false });
+});
+
+test('a comparison adds the changes tab to either format', () => {
+  assert.deepStrictEqual(availableViews('vortex', true), { diff: true, order: true });
+  assert.deepStrictEqual(availableViews('mo2', true), { diff: true, order: false });
+});
+
+test('with nothing loaded there is nowhere to go', () => {
+  assert.deepStrictEqual(availableViews(null, false), { diff: false, order: false });
+  assert.deepStrictEqual(availableViews(undefined, false), { diff: false, order: false });
 });
