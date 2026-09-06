@@ -44,8 +44,8 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   view exports too, as `*-changes.csv` / `*-changes.txt`)
 - **Markdown and BBCode** — a format picker next to the export buttons, for
   posting a load order on a forum, a wiki, or in a repo
-- **Three themes** — Midnight, Nexus and Liquid Glass, picked in the header
-  and remembered per browser
+- **Four themes** — Midnight, Vortex, NMM and Liquid Glass, picked in the
+  header and remembered per browser
 - **All-games export** — every Vortex game in one CSV with a `Game` column,
   for when you want the whole setup rather than one game at a time
 
@@ -245,19 +245,26 @@ changes, and matching noise there would be worse than the signal.
 
 ## Themes
 
-Three, picked from the header and remembered in `localStorage` per browser:
+Four, picked from the header and remembered in `localStorage` per browser:
 
 - **Midnight** — the default. Dark, violet accent.
-- **Nexus** — near-black with amber calls to action, in the spirit of the site
-  most of these mods come from.
+- **Vortex** — near-black with amber calls to action, in the spirit of the
+  app's own dark UI.
+- **NMM** — Nexus Mod Manager, the desktop app most Skyrim modders used
+  before Vortex existed. It was a plain .NET WinForms utility rather than a
+  branded app, so this is light grey chrome, a white grid with thin
+  gridlines, near-square corners, and a Windows-blue selection highlight —
+  closer to Explorer or classic uTorrent than to a website. Nexus green shows
+  up only where the real app used it: the activated-mod checkmark.
 - **Liquid Glass** — light and translucent: surfaces blur what is behind them,
   over a lit background that gives them something to refract.
 
 A theme is a block of custom properties. Colour, the tints behind badges and
 notices, the text that sits on a solid fill, and the corner radii are all
 tokens on `:root`, so a theme mostly restates values rather than rewriting
-rules. Liquid Glass is the one that adds rules of its own, for the blur and
-the bright inner edge along the top of each surface.
+rules — Vortex is about 30 lines as a result. NMM and Liquid Glass are the two
+that add rules of their own: a flat button that goes Windows-Aero-blue on
+hover and focus for NMM, blur and a bright inner edge for Liquid Glass.
 
 Two details that are easy to miss:
 

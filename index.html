@@ -369,11 +369,12 @@
   }
   .empty-note.show{ display:block; }
 
-  /* --- Nexus -------------------------------------------------------------
-     Near-black cool charcoal with amber calls to action. The recognisable
-     part is the solid amber fill with a near-black label, which is what a
-     primary action looks like on the site; --on-accent carries that. */
-  [data-theme="nexus"]{
+  /* --- Vortex -------------------------------------------------------------
+     Near-black cool charcoal with amber calls to action, mirroring Vortex's
+     own dark UI. The recognisable part is the solid amber fill with a
+     near-black label, which is what a primary action looks like there;
+     --on-accent carries that. */
+  [data-theme="vortex"]{
     --bg: #101114;
     --panel: #191b1f;
     --panel-2: #22252a;
@@ -400,9 +401,109 @@
   }
   /* A solid amber button carries its label at a heavier weight than a tinted
      one needs, or the near-black text reads thin against it. */
-  [data-theme="nexus"] .export-btns button,
-  [data-theme="nexus"] .view-tabs button.active{ font-weight: 600; }
-  [data-theme="nexus"] .export-btns button:hover{ background: #f7b52e; }
+  [data-theme="vortex"] .export-btns button,
+  [data-theme="vortex"] .view-tabs button.active{ font-weight: 600; }
+  [data-theme="vortex"] .export-btns button:hover{ background: #f7b52e; }
+
+  /* --- NMM -----------------------------------------------------------
+     Nexus Mod Manager: the desktop app most Skyrim modders used before
+     Vortex existed, and this tool's own spiritual predecessor. It was not a
+     themed, branded app -- it was a plain .NET WinForms utility, closer in
+     spirit to Windows Explorer or classic uTorrent than to a website. Light
+     grey chrome, a white data grid with thin grey gridlines, near-square
+     corners, and the one unmistakable Windows-native tell: a blue selection
+     highlight, not a brand colour, on whatever is active. Nexus green shows
+     up only where the real app used it -- the activated-mod checkmark --
+     which is why it is confined to status text and the checkbox tint rather
+     than spread across every button. */
+  [data-theme="nmm"]{
+    color-scheme: light;
+    --bg: #f0f0f0;
+    --panel: #ffffff;
+    --panel-2: #f7f7f7;
+    --line: #adadad;
+    --ink: #1a1a1a;
+    --ink-dim: #5a5a5a;
+    --accent: #3c8c3c;
+    --accent-dim: #3c8c3c;
+    --good: #2f8f3f;
+    --bad: #c42b1c;
+    --good-tint: rgba(47,143,63,0.12);
+    --good-edge: rgba(47,143,63,0.35);
+    --bad-tint: rgba(196,43,28,0.10);
+    --bad-edge: rgba(196,43,28,0.32);
+    --accent-tint: rgba(60,140,60,0.12);
+    --accent-ink: #2b6b2b;
+    --on-accent: #ffffff;
+    --on-good: #ffffff;
+    --thead-bg: linear-gradient(to bottom, #fafafa, #e8e8e8);
+    --r-control: 2px;
+    --r-btn: 2px;
+    --r-badge: 2px;
+    --r-panel: 2px;
+    --r-drop: 2px;
+    --sans: 'Segoe UI', Tahoma, Verdana, Arial, sans-serif;
+    --mono: 'Courier New', Courier, monospace;
+  }
+  /* A Windows 7 button: a barely-there vertical gradient and a 1px grey
+     border, flat rather than glossy -- WinForms controls of the era did not
+     draw drop shadows or bevels on themselves. The tell is the hover and
+     focus state, which every such control shared: chrome and border both
+     shift to the same "Aero" blue, not to the app's own accent. */
+  [data-theme="nmm"] .export-btns button{
+    background: linear-gradient(to bottom, #fafafa, #e5e5e5);
+    color: var(--ink);
+    border: 1px solid #adadad;
+  }
+  [data-theme="nmm"] .export-btns button:hover{
+    background: linear-gradient(to bottom, #eaf6fd, #d9f0fc);
+    border-color: #7eb4ea;
+  }
+  [data-theme="nmm"] .export-btns button.copied{
+    background: linear-gradient(to bottom, #eef7ec, #dcefd8);
+    color: var(--accent-ink);
+    border-color: var(--good);
+  }
+  [data-theme="nmm"] .view-tabs button.active{
+    background: linear-gradient(to bottom, #eaf6fd, #d9f0fc);
+    color: var(--ink);
+    border-color: #7eb4ea;
+  }
+  /* Fields stayed flat too by 2009 -- a plain white box and a 1px border,
+     with the same blue-on-focus tell as a button's hover. The grid header
+     is the one place gloss survives, because a ListView header genuinely
+     drew itself with a light gradient and a hard bottom rule; the mod list
+     in this app is the same control NMM's own mod list was. */
+  [data-theme="nmm"] select,
+  [data-theme="nmm"] #searchInput,
+  [data-theme="nmm"] .toggle-btn{
+    background: #ffffff;
+    border: 1px solid #7f9db9;
+  }
+  [data-theme="nmm"] select:focus,
+  [data-theme="nmm"] #searchInput:focus{
+    border-color: #3399ff;
+    outline-color: #3399ff;
+  }
+  [data-theme="nmm"] thead th{
+    border-bottom: 1px solid #999;
+  }
+  /* Alternating row shading is how a dense grid stayed readable before
+     per-column colour-coding, and the hover/selection tint is Windows' own
+     blue -- the one colour every native list in this era agreed on. */
+  [data-theme="nmm"] tbody tr:nth-child(even){ background: rgba(0,0,0,0.02); }
+  [data-theme="nmm"] tbody tr:hover{ background: rgba(51,153,255,0.10); }
+  [data-theme="nmm"] .dropzone{
+    background: var(--panel-2);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.10);
+  }
+  /* A period-correct scrollbar: flat, square, grey. Firefox has no
+     equivalent hook and keeps its own rather than falling back to
+     something wrong. */
+  [data-theme="nmm"] ::-webkit-scrollbar{ width: 16px; height: 16px; }
+  [data-theme="nmm"] ::-webkit-scrollbar-track{ background: #f0f0f0; }
+  [data-theme="nmm"] ::-webkit-scrollbar-thumb{ background: #c1c1c1; border: 1px solid #a0a0a0; }
+  [data-theme="nmm"] ::-webkit-scrollbar-thumb:hover{ background: #a8a8a8; }
 
   /* --- Liquid Glass ------------------------------------------------------
      Translucent material over a lit background, rather than flat fills. Three
@@ -599,7 +700,8 @@
         <label for="themeSelect">Theme</label>
         <select id="themeSelect">
           <option value="midnight">Midnight</option>
-          <option value="nexus">Nexus</option>
+          <option value="vortex">Vortex</option>
+          <option value="nmm">NMM</option>
           <option value="glass">Liquid Glass</option>
         </select>
       </div>
@@ -834,7 +936,7 @@
   // function rather than held in a shared const so the test harness, which
   // lifts these out one at a time, does not need the surrounding scope.
   function themeIds(){
-    return ['midnight', 'nexus', 'glass'];
+    return ['midnight', 'vortex', 'nmm', 'glass'];
   }
 
   // Anything unrecognised falls back to the default rather than leaving the
@@ -850,7 +952,8 @@
   // otherwise an unchecked box on the light theme paints as a dark square.
   function themeMeta(theme){
     const id = resolveTheme(theme);
-    if (id === 'nexus') return { colorScheme: 'dark', themeColor: '#101114' };
+    if (id === 'vortex') return { colorScheme: 'dark', themeColor: '#101114' };
+    if (id === 'nmm') return { colorScheme: 'light', themeColor: '#f0f0f0' };
     if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
     return { colorScheme: 'dark', themeColor: '#16141c' };
   }

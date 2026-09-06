@@ -882,7 +882,7 @@ test('diff exports escape a hostile name in both formats', () => {
 // --------------------------------------------------------------- theming
 
 test('themeIds: the picker offers exactly the themes that have a block', () => {
-  assert.deepStrictEqual(themeIds(), ['midnight', 'nexus', 'glass']);
+  assert.deepStrictEqual(themeIds(), ['midnight', 'vortex', 'nmm', 'glass']);
 });
 
 test('resolveTheme: a known id passes through', () => {
@@ -892,8 +892,9 @@ test('resolveTheme: a known id passes through', () => {
 test('resolveTheme: anything unrecognised falls back to the default', () => {
   // What comes out of storage is whatever was last written there, including by
   // an older version of this file. A value with no block behind it would leave
-  // the page unstyled rather than merely wrong.
-  ['', 'sepia', 'MIDNIGHT', ' glass', null, undefined, 0, {}].forEach((bad) => {
+  // the page unstyled rather than merely wrong -- 'nexus' is the theme's own
+  // former id, from before it was renamed to 'vortex'.
+  ['', 'sepia', 'nexus', 'MIDNIGHT', ' glass', null, undefined, 0, {}].forEach((bad) => {
     assert.strictEqual(resolveTheme(bad), 'midnight', JSON.stringify(bad) + ' should fall back');
   });
 });
@@ -906,12 +907,16 @@ test('themeMeta: every theme declares a colour scheme and a chrome colour', () =
   });
 });
 
-test('themeMeta: the light theme is the only one asking for light controls', () => {
+test('themeMeta: color-scheme matches whether each theme is actually light or dark', () => {
   // Native checkboxes and the select chevron follow color-scheme, not our
-  // variables -- getting this wrong paints a dark checkbox on a white page.
-  assert.strictEqual(themeMeta('glass').colorScheme, 'light');
-  assert.strictEqual(themeMeta('midnight').colorScheme, 'dark');
-  assert.strictEqual(themeMeta('nexus').colorScheme, 'dark');
+  // variables -- getting this wrong paints a dark checkbox on a white page,
+  // or a white one on a dark page. There is no shortcut like "only the light
+  // theme is light": NMM is a light theme too, so this has to be a mapping
+  // per id rather than one name singled out and everything else assumed dark.
+  assert.deepStrictEqual(
+    Object.fromEntries(themeIds().map((id) => [id, themeMeta(id).colorScheme])),
+    { midnight: 'dark', vortex: 'dark', nmm: 'light', glass: 'light' }
+  );
 });
 
 test('themeMeta: an unknown theme gets the default metadata, not undefined', () => {
