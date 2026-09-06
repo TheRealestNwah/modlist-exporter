@@ -102,7 +102,8 @@ python3 -m http.server 8000
 node --test test/*.test.js
 ```
 
-No dependencies and no build step. Because `index.html` is deliberately one
+No dependencies and no build step — not for the unit tests, and not for the
+browser ones either. Because `index.html` is deliberately one
 self-contained file with nothing to import, `test/extract.js` lifts the pure
 (DOM-free) functions out of it and evaluates them. There are two script
 elements — a small one in the head that applies the stored theme before first
@@ -160,22 +161,29 @@ to reach the same answer on. They each used to ask in their own words, which
 is how a column ends up in an export that wasn't in the view it came from, so
 they now share one answer and one test.
 
-That leaves the wiring untested — whether a listener is attached, whether an
-element ID is right. Most of those fail loudly on first load: a missing element
-throws, a missing listener means a button does nothing.
+That leaves the wiring — whether a listener is attached, whether an element ID
+is right, whether switching views leaves the previous one's furniture on
+screen. Most of those fail loudly on first load, but not all: loading a new
+file while the changes view was open reset `view` and none of the chrome that
+goes with it, so the summary bar read "4 changes" over a mod list. Nothing
+threw, nothing looked broken unless you had taken that exact path, and it
+shipped across several releases before anyone noticed.
 
-Not all of them, though, and it is worth being honest about the one that got
-through. Loading a new file while the changes view was open reset `view` but
-none of the chrome that goes with it, so the summary bar read "4 changes" over
-a mod list. Nothing threw, nothing looked broken unless you had taken that
-exact path, and it shipped across several releases before anyone noticed. The
-trade is still the right one for a single file with no build step — but the
-reason it is worth making is that these bugs are *rare and cheap*, not that
-they are all loud.
+`test/smoke.test.js` covers that ground now. It drives a real browser: loads
+`index.html`, pushes a file through the actual `<input>`, clicks the actual
+tabs and buttons, and asserts on what the page ends up showing — including
+that switching views leaves nothing behind, which is the bug above.
 
-What actually catches them is driving the page: load a file, compare a second,
-switch views, export from each. Worth doing before a release that touched the
-render or view layer, since the suite deliberately cannot.
+It needs no packages either. Node's built-in `WebSocket` plus the Chrome
+DevTools Protocol is enough to open a page, evaluate an expression in it and
+read the value back, so it drives whichever Chrome, Chromium or Edge is
+already on the machine. A suite that required a browser download to verify a
+tool with nothing to install would be an odd way to keep that promise.
+
+Locally the smoke tests skip when no browser is found, so the suite still runs
+on a bare machine; point `CHROME_PATH` at one to run them. In CI
+`SMOKE_REQUIRED=1` turns that skip into a failure, because a green run that
+silently tested none of the wiring is worse than not having the tests.
 
 One test is skipped unless you have local Vortex backups: if
 `%APPDATA%\Vortex\temp\state_backups_full\` holds two or more state files, it
