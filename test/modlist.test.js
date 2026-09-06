@@ -11,8 +11,7 @@ const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matche
         defaultProfileFor, gamesWithMods, allGamesRows,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
-        themeIds, resolveTheme, themeMeta,
-        shouldReloadFile, watchNoteText } = require('./extract.js');
+        themeIds, resolveTheme, themeMeta } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -923,56 +922,6 @@ test('themeMeta: color-scheme matches whether each theme is actually light or da
 
 test('themeMeta: an unknown theme gets the default metadata, not undefined', () => {
   assert.deepStrictEqual(themeMeta('nope'), themeMeta('midnight'));
-});
-
-// -------------------------------------------------- auto-refresh
-
-test('shouldReloadFile: an unchanged timestamp is not a change', () => {
-  assert.strictEqual(shouldReloadFile(1700000000000, 1700000000000), false);
-});
-
-test('shouldReloadFile: a newer timestamp is a change', () => {
-  assert.strictEqual(shouldReloadFile(1700000000000, 1700000060000), true);
-});
-
-test('shouldReloadFile: a timestamp moving backwards is a change too', () => {
-  // Restoring a backup over the watched file rewinds its mtime, and the
-  // contents on screen are stale all the same.
-  assert.strictEqual(shouldReloadFile(1700000060000, 1700000000000), true);
-});
-
-test('shouldReloadFile: nothing useful from the handle never reloads', () => {
-  for (const bad of [null, undefined, NaN, Infinity, '1700000000000', {}]) {
-    assert.strictEqual(shouldReloadFile(1700000000000, bad), false,
-      'a next value of ' + String(bad) + ' must not trigger a reload');
-    assert.strictEqual(shouldReloadFile(bad, 1700000000000), false,
-      'a prev value of ' + String(bad) + ' must not trigger a reload');
-  }
-});
-
-test('shouldReloadFile: no file loaded yet means nothing to reload', () => {
-  assert.strictEqual(shouldReloadFile(null, 1700000000000), false);
-});
-
-test('watchNoteText: off explains that the file was read once', () => {
-  assert.match(watchNoteText(false, 0, ''), /^Off —/);
-  // Reload history from an earlier session must not read as still watching.
-  assert.match(watchNoteText(false, 3, '10:04:00'), /^Off —/);
-});
-
-test('watchNoteText: watching with no reload yet says what it is waiting for', () => {
-  const note = watchNoteText(true, 0, '');
-  assert.match(note, /Watching/);
-  assert.doesNotMatch(note, /reloaded/);
-});
-
-test('watchNoteText: reload counts are singular and plural', () => {
-  assert.match(watchNoteText(true, 1, '10:04:00'), /reloaded 1 time, last at 10:04:00\./);
-  assert.match(watchNoteText(true, 2, '10:05:00'), /reloaded 2 times, last at 10:05:00\./);
-});
-
-test('watchNoteText: a missing timestamp still produces a clean sentence', () => {
-  assert.strictEqual(watchNoteText(true, 1, ''), 'Watching — reloaded 1 time.');
 });
 
 // -------------------------------------------------- optional: real backups

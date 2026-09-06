@@ -180,16 +180,6 @@
   .freshness.fresh{ background: var(--good-tint); color: var(--good); border: 1px solid var(--good-edge); }
   .freshness.stale{ background: var(--bad-tint); color: var(--bad); border: 1px solid var(--bad-edge); }
 
-  .watch{
-    margin-top: 10px;
-    display: none;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .watch.show{ display: flex; }
-  .watch-note{ font-size: 12px; color: var(--ink-dim); font-family: var(--mono); }
-
   .controls{
     margin-top: 26px;
     display: none;
@@ -954,10 +944,6 @@
   </div>
   <div class="status" id="status"></div>
   <div class="freshness" id="freshness"></div>
-  <div class="watch" id="watchRow">
-    <label class="toggle-btn"><input type="checkbox" id="watchToggle"> Auto-refresh</label>
-    <span class="watch-note" id="watchNote"></span>
-  </div>
 
   <div class="controls" id="controls">
     <div class="field" id="gameField">
@@ -1067,9 +1053,6 @@
   const fileInput = document.getElementById('fileInput');
   const statusEl = document.getElementById('status');
   const freshnessEl = document.getElementById('freshness');
-  const watchRow = document.getElementById('watchRow');
-  const watchToggle = document.getElementById('watchToggle');
-  const watchNote = document.getElementById('watchNote');
   const controls = document.getElementById('controls');
   const gameSelect = document.getElementById('gameSelect');
   const profileSelect = document.getElementById('profileSelect');
@@ -1123,39 +1106,23 @@
   // and the one thing that loads a file could not. A div with role=button
   // gets no key handling from the browser, so Enter and Space are wired up
   // here the way a real button would have given them for free.
-  function activateOnKey(zone, activate){
+  function activateOnKey(zone, input){
     zone.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' '){
         e.preventDefault(); // Space would otherwise scroll the page
-        activate();
+        input.click();
       }
     });
   }
 
-  dropzone.addEventListener('click', choosePrimary);
-  activateOnKey(dropzone, choosePrimary);
+  dropzone.addEventListener('click', () => fileInput.click());
+  activateOnKey(dropzone, fileInput);
   dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
   dropzone.addEventListener('drop', e => {
     e.preventDefault();
     dropzone.classList.remove('drag');
-    // Both of these have to be read now: the DataTransfer is emptied as soon
-    // as this handler returns, so nothing can be pulled off it from a
-    // callback later.
-    const file = e.dataTransfer.files.length ? e.dataTransfer.files[0] : null;
-    const item = e.dataTransfer.items && e.dataTransfer.items.length ? e.dataTransfer.items[0] : null;
-    // Chromium can hand back a re-readable handle for a dropped file, which
-    // makes a dragged-in file watchable too. Anywhere else, and for anything
-    // that isn't a plain file, the File on its own is all there is.
-    if (canWatch && item && typeof item.getAsFileSystemHandle === 'function'){
-      const fallback = () => { if (file) handleFile(file); };
-      item.getAsFileSystemHandle().then(handle => {
-        if (handle && handle.kind === 'file') handle.getFile().then(f => handleFile(f, handle), fallback);
-        else fallback();
-      }, fallback);
-      return;
-    }
-    if (file) handleFile(file);
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
   });
   fileInput.addEventListener('change', e => {
     if (e.target.files.length) handleFile(e.target.files[0]);
@@ -1307,7 +1274,7 @@
     compareStatus.className = 'status' + (cls ? ' ' + cls : '');
   }
 
-  function handleFile(file, handle){
+  function handleFile(file){
     setStatus('Reading ' + file.name + ' …');
     freshnessEl.classList.remove('show');
     readFile(file, text => {
@@ -1328,191 +1295,8 @@
       showFreshness(file, STALE_NOTE[parsed.type]);
       if (parsed.type === 'mo2') populateMO2(); else populateGames();
       compareWrap.classList.add('show');
-
-      // Watching belongs to the file, not to the page: a newly chosen file
-      // starts unwatched, and can only be watched at all if it arrived with
-      // a handle to re-read it from.
-      stopWatch();
-      primaryHandle = handle || null;
-      reloadCount = 0;
-      lastReloadTime = '';
-      updateWatchUI();
-      if (primaryHandle && watchPreference()) setWatching(true);
     }, msg => setStatus(msg, 'err'));
   }
-
-  // ---- Auto-refresh -----------------------------------------------------
-  // Vortex rewrites startup.json and hourly.json in place, so a handle from
-  // the File System Access API keeps pointing at whatever is in that file
-  // now. There is no change event to subscribe to, so watching means
-  // polling: ask the handle for a fresh File every few seconds and look at
-  // its timestamp. getFile() reads metadata rather than contents, so the
-  // poll costs almost nothing and the file is re-parsed only when its
-  // timestamp actually moves.
-  //
-  // The whole feature is additive. Firefox and Safari have no picker to hand
-  // back a handle, a dropped file only carries one on Chromium, and the
-  // load-once path above is untouched either way: no handle simply means the
-  // auto-refresh row never appears.
-
-  const WATCH_INTERVAL_MS = 4000;
-  const canWatch = typeof window.showOpenFilePicker === 'function';
-  const PICKER_TYPES = [{
-    description: 'Mod list files',
-    accept: { 'application/json': ['.json'], 'text/plain': ['.txt'] }
-  }];
-
-  let primaryHandle = null; // re-readable handle for `primaryFile`, if we got one
-  let pickerUnusable = false; // the API is there but refused to open
-  let watchTimer = null;
-  let polling = false;      // one poll in flight at a time
-  let reloadCount = 0;
-  let lastReloadTime = '';
-
-  // Kept pure so the "has it actually changed?" rule is testable without a
-  // browser. Only a real, finite, different timestamp counts as a change, so
-  // a handle that reports nothing useful can never trigger a re-parse. Any
-  // difference counts, not just a newer one: restoring a backup moves the
-  // timestamp backwards and still means the contents changed.
-  function shouldReloadFile(prevLastModified, nextLastModified){
-    if (typeof prevLastModified !== 'number' || !isFinite(prevLastModified)) return false;
-    if (typeof nextLastModified !== 'number' || !isFinite(nextLastModified)) return false;
-    return prevLastModified !== nextLastModified;
-  }
-
-  function watchNoteText(watching, reloads, lastTimeStr){
-    if (!watching) return 'Off — this file was read once, when you chose it.';
-    if (!reloads) return 'Watching this file. It reloads here when your mod manager writes to it.';
-    return 'Watching — reloaded ' + reloads + (reloads === 1 ? ' time' : ' times') +
-      (lastTimeStr ? ', last at ' + lastTimeStr : '') + '.';
-  }
-
-  function watchPreference(){
-    try{ return localStorage.getItem('modlist-watch') === 'on'; }catch(e){ return false; }
-  }
-
-  function updateWatchUI(){
-    watchRow.classList.toggle('show', canWatch && !!primaryHandle);
-    const watching = watchTimer !== null;
-    watchToggle.checked = watching;
-    watchNote.textContent = watchNoteText(watching, reloadCount, lastReloadTime);
-  }
-
-  // Turning watching off through the toggle is a preference worth keeping;
-  // stopWatch() below is the mechanical version used when the file changes
-  // underneath us, and deliberately leaves that preference alone.
-  function setWatching(on){
-    if (on && primaryHandle && watchTimer === null){
-      watchTimer = setInterval(pollPrimary, WATCH_INTERVAL_MS);
-    } else if (!on){
-      stopWatch();
-    }
-    try{ localStorage.setItem('modlist-watch', on ? 'on' : 'off'); }catch(e){ /* nothing to persist to */ }
-    updateWatchUI();
-  }
-
-  function stopWatch(){
-    if (watchTimer !== null){ clearInterval(watchTimer); watchTimer = null; }
-  }
-
-  function pollPrimary(){
-    if (!primaryHandle || polling) return;
-    polling = true;
-    primaryHandle.getFile().then(file => {
-      polling = false;
-      if (shouldReloadFile(primaryFile && primaryFile.lastModified, file.lastModified)) reloadPrimary(file);
-    }, () => {
-      // The file was renamed, deleted, or the permission lapsed. Nothing
-      // here can ask for it back without a click, so drop the handle and
-      // say so rather than polling a dead handle forever.
-      polling = false;
-      stopWatch();
-      primaryHandle = null;
-      updateWatchUI();
-      setStatus('Lost access to that file, so auto-refresh stopped. Choose it again to resume.', 'err');
-    });
-  }
-
-  // A reload is not a fresh load. The point of it is that the page still
-  // looks like it did a second ago, so the game, the profile, the current
-  // view and any loaded comparison all survive the re-parse.
-  function reloadPrimary(file){
-    readFile(file, text => {
-      const res = parseModlist(text);
-      if (res.error){
-        setStatus('That file changed, but the new contents did not parse: ' + res.error, 'err');
-        return;
-      }
-      if (parsed && res.source.type !== parsed.type){
-        setWatching(false);
-        setStatus('That file is now in a different mod manager\'s format. Choose it again to load it.', 'err');
-        return;
-      }
-
-      const prevGame = gameSelect.value;
-      const prevProfile = profileSelect.value;
-      const prevView = view;
-
-      parsed = res.source;
-      primaryFile = file;
-      if (parsed.type === 'mo2') populateMO2(); else populateGames();
-      restoreSelection(prevGame, prevProfile);
-      // populateGames() shows the list controls again, so a diff being read
-      // when the file changed has to be put back deliberately.
-      if (prevView === 'diff' && compareSource) setView('diff');
-
-      reloadCount += 1;
-      lastReloadTime = new Date().toLocaleTimeString();
-      setStatus('Reloaded ' + file.name + ' ✓', 'ok');
-      showFreshness(file, STALE_NOTE[parsed.type]);
-      updateWatchUI();
-    }, msg => setStatus(msg, 'err'));
-  }
-
-  // populateGames() rebuilds both selects from scratch and picks its own
-  // defaults, so a selection has to be put back afterwards — and only if it
-  // is still on offer, since the rewritten file may have lost that game or
-  // that profile entirely.
-  function restoreSelection(gameId, profileKey){
-    if (!parsed || parsed.type === 'mo2') return;
-    if (gameId && selectHas(gameSelect, gameId) && gameSelect.value !== gameId){
-      gameSelect.value = gameId;
-      populateProfiles(gameId);
-    }
-    if (profileKey && selectHas(profileSelect, profileKey) && profileSelect.value !== profileKey){
-      profileSelect.value = profileKey;
-      refresh();
-    }
-  }
-
-  function selectHas(select, value){
-    return Array.prototype.some.call(select.options, o => o.value === value);
-  }
-
-  // Chromium's picker returns a handle that can be re-read later; every
-  // other browser gets the plain file input it always got. Both paths end up
-  // in handleFile(), the second one simply without a handle.
-  function choosePrimary(){
-    if (!canWatch || pickerUnusable){ fileInput.click(); return; }
-    window.showOpenFilePicker({ types: PICKER_TYPES, multiple: false }).then(handles => {
-      const handle = handles && handles[0];
-      if (!handle) return;
-      handle.getFile().then(file => handleFile(file, handle), () => setStatus('Could not read that file.', 'err'));
-    }, err => {
-      // A cancelled picker is not an error, and leaves nothing to say.
-      if (err && err.name === 'AbortError') return;
-      // Anything else means the API is exposed but refuses to open here.
-      // Falling straight through to the file input does not work: calling
-      // showOpenFilePicker() spent the click, and the browser will not open
-      // a file dialog without a fresh one. So remember the picker is a dead
-      // end -- every later click goes directly to the input -- and ask for
-      // that one extra click rather than looking like nothing happened.
-      pickerUnusable = true;
-      setStatus('This browser would not open its file picker. Click again to choose a file.', 'err');
-    });
-  }
-
-  watchToggle.addEventListener('change', () => setWatching(watchToggle.checked));
 
   function handleCompareFile(file){
     if (!parsed) return;
@@ -1966,7 +1750,7 @@
   viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
 
   compareZone.addEventListener('click', () => compareInput.click());
-  activateOnKey(compareZone, () => compareInput.click());
+  activateOnKey(compareZone, compareInput);
   compareZone.addEventListener('dragover', e => { e.preventDefault(); compareZone.classList.add('drag'); });
   compareZone.addEventListener('dragleave', () => compareZone.classList.remove('drag'));
   compareZone.addEventListener('drop', e => {

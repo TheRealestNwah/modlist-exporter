@@ -44,8 +44,6 @@ const NAMES = [
   'bbcodeLines',
   'markdownDiffLines',
   'bbcodeDiffLines',
-  'shouldReloadFile',
-  'watchNoteText',
   'themeIds',
   'resolveTheme',
   'themeMeta',
