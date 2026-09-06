@@ -56,9 +56,9 @@ install.
 
 - `index.html` — everything (markup, CSS, JS) lives in this one file.
 - `test/` — tests. Development only; nothing here is needed to use the tool.
-- `docs/` — the README screenshot and the social preview image. Neither is
-  loaded by the tool; `og.png` is only ever fetched by a crawler when someone
-  shares the link.
+- `docs/` — the README screenshot, the social preview image, and a note on
+  deploying. None of it is loaded by the tool; `og.png` is only ever fetched
+  by a crawler when someone shares the link.
 
 ## Running it
 
@@ -140,31 +140,10 @@ those changes live. Pushing a bare tag isn't enough — the release itself has
 to be published. There's a manual "Run workflow" button on the Actions tab if
 you ever need to redeploy without cutting a release.
 
-### The github-pages environment needs a tag policy
-
-This is repository configuration, not something in this repo, and it is easy
-to lose. A `release` event runs against the **tag** ref, not a branch. If the
-`github-pages` environment is restricted to deploying from `main` only — which
-is how GitHub sets it up by default — then a release-triggered deploy is
-rejected before it starts.
-
-The failure is nasty to diagnose: the job completes in about two seconds with
-`failure`, an **empty step list**, and no error message anywhere in the logs,
-because it never got as far as running a step.
-
-The fix is to allow tags to deploy, under
-**Settings → Environments → github-pages → Deployment branches and tags**:
-add a rule of type *tag* matching `*`, alongside the existing `main` branch
-rule. Equivalently, via the API:
-
-```bash
-gh api -X POST \
-  repos/:owner/:repo/environments/github-pages/deployment-branch-policies \
-  -f name='*' -f type=tag
-```
-
-Worth re-checking if that environment is ever recreated, or if you fork this
-repo and enable Pages on the fork.
+Repository configuration for the `github-pages` environment — a nasty gotcha
+around deploying from a tag rather than a branch — is covered separately in
+[`docs/deploying.md`](docs/deploying.md), since it's about administering this
+repo rather than about the tool itself.
 
 ## How it works
 
@@ -374,20 +353,15 @@ Files you may find there, in rough order of freshness:
 
 - `manual.json` — only created when the user explicitly triggers a backup via
   **Settings → Workarounds → Backup** in Vortex. This is the most reliable
-  way to get a fresh snapshot on demand.
+  way to get a fresh snapshot: the other two are written automatically, but
+  that scheduler can stop working without surfacing an error, leaving both
+  stale for weeks — exactly what the freshness warning below is for.
 - `startup.json` — rewritten each time Vortex launches.
 - `hourly.json` — rewritten roughly once per hour while Vortex is running.
 
 A `startup.json` also exists directly under `%AppData%\Vortex\` (not inside
 `temp\state_backups_full`) — that one is a smaller session/window-settings
 file and does **not** contain mod data. Easy to grab by mistake.
-
-**Known issue:** on at least one real install, the automatic backup scheduler
-silently stopped updating `startup.json`/`hourly.json` (both sat stale for
-weeks despite mods being installed/removed in that time), with no obvious
-error surfaced to the user. No root cause was confirmed. The manual backup
-button was a reliable workaround — this is exactly what the freshness
-warning in the tool now helps catch early.
 
 ### Mod Organizer 2
 
@@ -416,9 +390,9 @@ line is the top. Because mods lower in MO2's pane win file conflicts, that
 means **line 1 is the highest priority and the last line is priority 0** —
 the opposite of the intuitive reading.
 
-This was verified against a real profile on 2026-09-05 rather than assumed.
-Two things confirmed it: `ModOrganizer.ini` records the pane's display order
-in `MainWindow_modList_index`, ending with the `Overwrite` entry that MO2
+This was verified against a real profile rather than assumed. Two things
+confirmed it: `ModOrganizer.ini` records the pane's display order in
+`MainWindow_modList_index`, ending with the `Overwrite` entry that MO2
 always pins to the bottom of the pane, and that order is the exact reverse
 of the file. The pane's top row was then checked directly in MO2.
 
