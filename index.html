@@ -779,7 +779,52 @@
      pair rather than the same theme renamed twice. Both keep red for an
      alert state -- a monochrome screen can still flag "DISABLED" in a
      second colour, the way a terminal's own warning text would. */
-  [data-theme="fo3"], [data-theme="nv"]{
+  /* Acid yellow on near-black with a cyan counterpoint, which is the palette
+     Cyberpunk 2077's interface is built from. Square corners and a heavy
+     accent, since the look is signage rather than software. */
+  [data-theme="cyberpunk"]{
+    color-scheme: dark;
+    --bg: #0b0b0d;
+    --panel: #131317;
+    --panel-2: #1b1b21;
+    --line: #2e2e38;
+    --ink: #ecedf1;
+    --ink-dim: #8a8d99;
+    --accent: #fcee0a;
+    --accent-dim: #b5a806;
+    --good: #00f0ff;
+    --bad: #ff2e56;
+    --good-tint: rgba(0,240,255,0.14);
+    --good-edge: rgba(0,240,255,0.38);
+    --bad-tint: rgba(255,46,86,0.14);
+    --bad-edge: rgba(255,46,86,0.38);
+    --accent-tint: rgba(252,238,10,0.16);
+    --accent-ink: var(--accent);
+    /* Yellow is far too bright to put light text on. */
+    --on-accent: #0b0b0d;
+    --on-good: #04252a;
+    --thead-bg: #131317;
+    --r-control: 2px;
+    --r-btn: 2px;
+    --r-badge: 2px;
+    --r-panel: 2px;
+    --r-drop: 2px;
+  }
+  /* The one flourish: a hairline under the header, the way the game underlines
+     its own headings. Kept to one element so the theme stays a palette. */
+  [data-theme="cyberpunk"] header h1{
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 6px;
+    display: inline-block;
+  }
+  [data-theme="cyberpunk"] .export-btns button,
+  [data-theme="cyberpunk"] .view-tabs button.active{ font-weight: 700; }
+  [data-theme="cyberpunk"] thead th{
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+
+  [data-theme="green"], [data-theme="amber"]{
     color-scheme: dark;
     --sans: ui-monospace, 'Courier New', Courier, monospace;
     --mono: ui-monospace, 'Courier New', Courier, monospace;
@@ -796,7 +841,7 @@
        of what it says. */
     text-shadow: 0 0 4px currentColor;
   }
-  [data-theme="fo3"]{
+  [data-theme="green"]{
     --bg: #030d03;
     --panel: #05170a;
     --panel-2: #072208;
@@ -815,7 +860,7 @@
     --accent-ink: #ffdd55;
     --thead-bg: #05170a;
   }
-  [data-theme="nv"]{
+  [data-theme="amber"]{
     --bg: #0d0700;
     --panel: #1a0d00;
     --panel-2: #241300;
@@ -840,49 +885,49 @@
      inverts to a solid phosphor fill via the existing --accent-dim /
      --on-accent tokens, which is exactly what selecting a highlighted
      terminal menu item looks like. */
-  [data-theme="fo3"] .export-btns button,
-  [data-theme="nv"] .export-btns button{
+  [data-theme="green"] .export-btns button,
+  [data-theme="amber"] .export-btns button{
     background: transparent;
     color: var(--accent);
     border: 1px solid var(--accent);
     font-weight: 400;
   }
-  [data-theme="fo3"] .export-btns button:hover,
-  [data-theme="nv"] .export-btns button:hover{
+  [data-theme="green"] .export-btns button:hover,
+  [data-theme="amber"] .export-btns button:hover{
     background: var(--accent);
     color: var(--on-accent);
     text-shadow: none;
   }
-  [data-theme="fo3"] .export-btns button::before,
-  [data-theme="fo3"] .view-tabs button::before,
-  [data-theme="nv"] .export-btns button::before,
-  [data-theme="nv"] .view-tabs button::before{ content: '[ '; }
-  [data-theme="fo3"] .export-btns button::after,
-  [data-theme="fo3"] .view-tabs button::after,
-  [data-theme="nv"] .export-btns button::after,
-  [data-theme="nv"] .view-tabs button::after{ content: ' ]'; }
+  [data-theme="green"] .export-btns button::before,
+  [data-theme="green"] .view-tabs button::before,
+  [data-theme="amber"] .export-btns button::before,
+  [data-theme="amber"] .view-tabs button::before{ content: '[ '; }
+  [data-theme="green"] .export-btns button::after,
+  [data-theme="green"] .view-tabs button::after,
+  [data-theme="amber"] .export-btns button::after,
+  [data-theme="amber"] .view-tabs button::after{ content: ' ]'; }
   /* Chrome reads as terminal labels in caps; the mod list itself -- names,
      versions, search text -- stays as typed, since a long list set entirely
      in capitals is real data made harder to scan, not more authentic. */
-  [data-theme="fo3"] h1, [data-theme="nv"] h1,
-  [data-theme="fo3"] .eyebrow, [data-theme="nv"] .eyebrow,
-  [data-theme="fo3"] thead th, [data-theme="nv"] thead th,
-  [data-theme="fo3"] .export-btns button, [data-theme="nv"] .export-btns button,
-  [data-theme="fo3"] .view-tabs button, [data-theme="nv"] .view-tabs button,
-  [data-theme="fo3"] .badge, [data-theme="nv"] .badge,
-  [data-theme="fo3"] .toggle-btn, [data-theme="nv"] .toggle-btn,
-  [data-theme="fo3"] .field label, [data-theme="nv"] .field label{
+  [data-theme="green"] h1, [data-theme="amber"] h1,
+  [data-theme="green"] .eyebrow, [data-theme="amber"] .eyebrow,
+  [data-theme="green"] thead th, [data-theme="amber"] thead th,
+  [data-theme="green"] .export-btns button, [data-theme="amber"] .export-btns button,
+  [data-theme="green"] .view-tabs button, [data-theme="amber"] .view-tabs button,
+  [data-theme="green"] .badge, [data-theme="amber"] .badge,
+  [data-theme="green"] .toggle-btn, [data-theme="amber"] .toggle-btn,
+  [data-theme="green"] .field label, [data-theme="amber"] .field label{
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  [data-theme="fo3"] tbody tr:hover, [data-theme="nv"] tbody tr:hover{
+  [data-theme="green"] tbody tr:hover, [data-theme="amber"] tbody tr:hover{
     background: var(--panel-2);
   }
   /* The scanline-and-vignette overlay is a fixed pseudo-element on <html>
      itself, above every real element including the sticky table header --
      a CRT's glass covers the whole tube, not just part of it. It carries
      no pointer-events, so nothing under it stops working. */
-  [data-theme="fo3"]::before, [data-theme="nv"]::before{
+  [data-theme="green"]::before, [data-theme="amber"]::before{
     content: '';
     position: fixed;
     inset: 0;
@@ -972,8 +1017,9 @@
           <option value="nmm">NMM</option>
           <option value="glass">Liquid Glass</option>
           <option value="uesp">UESP</option>
-          <option value="fo3">Fallout 3 terminal</option>
-          <option value="nv">New Vegas terminal</option>
+          <option value="green">Terminal Green</option>
+          <option value="amber">Terminal Amber</option>
+          <option value="cyberpunk">Cyberpunk</option>
         </select>
       </div>
     </div>
@@ -1259,7 +1305,17 @@
   // function rather than held in a shared const so the test harness, which
   // lifts these out one at a time, does not need the surrounding scope.
   function themeIds(){
-    return ['midnight', 'vortex', 'nmm', 'glass', 'uesp', 'fo3', 'nv'];
+    return ['midnight', 'vortex', 'nmm', 'glass', 'uesp', 'green', 'amber', 'cyberpunk'];
+  }
+
+  // The two terminal themes were once named after the games they resemble, and
+  // their stored ids said so. Renaming them to describe the colour rather than
+  // the game would have quietly reset anyone who had one selected, so the old
+  // ids still resolve to the new ones.
+  function legacyThemeId(value){
+    if (value === 'fo3') return 'green';
+    if (value === 'nv') return 'amber';
+    return null;
   }
 
   // Anything unrecognised falls back to the default rather than leaving the
@@ -1267,7 +1323,8 @@
   // whatever was last written there, including by an older version of this file.
   function resolveTheme(value){
     const id = String(value === null || value === undefined ? '' : value);
-    return themeIds().indexOf(id) === -1 ? 'midnight' : id;
+    if (themeIds().indexOf(id) !== -1) return id;
+    return legacyThemeId(id) || 'midnight';
   }
 
   // Native controls and the mobile browser chrome follow these two meta tags
@@ -1279,8 +1336,9 @@
     if (id === 'nmm') return { colorScheme: 'light', themeColor: '#f0f0f0' };
     if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
     if (id === 'uesp') return { colorScheme: 'light', themeColor: '#f2e2c4' };
-    if (id === 'fo3') return { colorScheme: 'dark', themeColor: '#030d03' };
-    if (id === 'nv') return { colorScheme: 'dark', themeColor: '#0d0700' };
+    if (id === 'green') return { colorScheme: 'dark', themeColor: '#030d03' };
+    if (id === 'amber') return { colorScheme: 'dark', themeColor: '#0d0700' };
+    if (id === 'cyberpunk') return { colorScheme: 'dark', themeColor: '#0b0b0d' };
     return { colorScheme: 'dark', themeColor: '#16141c' };
   }
 
