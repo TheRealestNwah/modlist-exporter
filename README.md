@@ -8,7 +8,7 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-![The mod list view: a Skyrim Special Edition profile showing search and sort controls, per-mod install sizes with a disk total, collection membership, endorsement status, enabled state and Nexus links](docs/screenshot.png)
+![The mod list view in the Vortex theme: a Skyrim Special Edition profile showing the theme picker, search and sort controls, per-mod install sizes with a disk total, collection membership, endorsement status, enabled/disabled state, and Nexus links](docs/screenshot.png)
 
 <sub>Example data — not a real load order.</sub>
 
