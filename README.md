@@ -70,6 +70,13 @@ install.
   deploying. None of it is loaded by the tool; `og.png` is only ever fetched
   by a crawler when someone shares the link.
 
+## Browser support
+
+Any current browser. There is no build step, no framework, and nothing that
+depends on a particular engine — the tool reads a file you choose and renders a
+table. It works offline and from a local file, and it makes no network requests
+at all.
+
 ## Running it
 
 Use the [live demo](https://therealestnwah.github.io/modlist-exporter/), or
@@ -538,9 +545,33 @@ comparable ordering.
 - [x] Endorsement status, with a filter for mods not yet endorsed
 - [x] Export every Vortex game at once, in one CSV
 - [x] Markdown / BBCode export, for sharing a load order on a forum
-- [ ] Surface Vortex load order when present in the state file
-      (game-extension dependent)
-- [ ] Folder-watch / auto-refresh via the File System Access API
+- [x] Surface Vortex load order when the game extension provides it
+- [x] Install date, and mods sharing a Nexus mod page
+
+## Considered and not doing
+
+Ideas investigated against a real 436-mod library and turned down. Recorded so
+the same suggestions don't get re-litigated later.
+
+- **Auto-refresh when the file changes on disk.** Built, and it worked. Removed
+  because it needs the File System Access API, which is Chromium-only and
+  unavailable when the page is opened directly from disk — the way most local
+  use happens. A feature most users could not reach.
+- **Duplicate-mod detection.** Grouping by Nexus mod id found 35 apparent
+  duplicates, which looked compelling and was wrong: those are legitimate
+  multi-file mod pages. Grouping by file checksum, which is what an actual
+  duplicate shares, found none at all, and no disk held by redundant copies.
+  The first version would have raised 35 false alarms on a tidy setup.
+- **Disk used by disabled mods.** 0.1 GB against 26.3 GB enabled on the largest
+  profile tested. No signal worth a column.
+- **Mod thumbnails.** Vortex records a picture URL for most mods, but rendering
+  them would make the page fetch from Nexus's CDN. It currently makes no
+  network requests at all, and that is worth more than pictures.
+- **Category grouping.** Vortex stores categories as numeric Nexus ids, so
+  making them readable means shipping and maintaining a per-game lookup table.
+- **"Update available" flags.** Only 48% of mods carry both a current and a
+  newest version, and most differences are formatting rather than real updates
+  — `2.0.0` against `2.0`. Mostly false positives.
 
 ## AI disclosure
 
