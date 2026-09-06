@@ -9,6 +9,7 @@ const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matche
         collectionMembership, collectionLabel, viewState,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
         defaultProfileFor, gamesWithMods, allGamesRows, allGamesFileName,
+        columnsIn, csvStatus, statusLabel,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
         themeIds, resolveTheme, themeMeta } = require('./extract.js');
@@ -600,6 +601,52 @@ test('viewState: the not-endorsed filter keeps only undecided mods', () => {
 test('viewState: hasEndo reflects whether any endorsement data exists', () => {
   assert.strictEqual(viewState([V('A', { endorsed: 'Undecided' })], {}).hasEndo, true);
   assert.strictEqual(viewState([V('A')], {}).hasEndo, false);
+});
+
+// --------------------------------------------- column presence / csv status
+
+test('columnsIn: reports only the columns the rows actually carry', () => {
+  // An MO2 row set: an order, and nothing else optional.
+  const mo2 = [{ name: 'A', order: 1 }];
+  assert.deepStrictEqual(columnsIn(mo2), { order: true, size: false, coll: false, endo: false });
+});
+
+test('columnsIn: one row carrying a field is enough to show the column', () => {
+  const rows = [{ name: 'A' }, { name: 'B', size: 10 }];
+  assert.strictEqual(columnsIn(rows).size, true);
+});
+
+test('columnsIn: an endorsement decision of any kind counts, including Abstained', () => {
+  assert.strictEqual(columnsIn([{ endorsed: 'Abstained' }]).endo, true);
+  assert.strictEqual(columnsIn([{ endorsed: undefined }]).endo, false);
+  assert.strictEqual(columnsIn([{ endorsed: null }]).endo, false);
+});
+
+test('columnsIn: an empty or missing row set carries no columns', () => {
+  const none = { order: false, size: false, coll: false, endo: false };
+  assert.deepStrictEqual(columnsIn([]), none);
+  assert.deepStrictEqual(columnsIn(null), none);
+});
+
+test('columnsIn: the view and the exports agree about the same rows', () => {
+  // The whole point of the helper -- viewState decides the table's columns,
+  // and the exports have to reach the same answer or a column appears in a
+  // file that was not in the view it came from.
+  const rows = [V('A', { size: 10 }), V('B', { endorsed: 'Undecided' })];
+  const view = viewState(rows, {});
+  const cols = columnsIn(rows);
+  assert.deepStrictEqual(
+    { order: view.hasOrder, size: view.hasSize, coll: view.hasColl, endo: view.hasEndo },
+    cols);
+});
+
+test('csvStatus: an unknown state is blank, not the em dash the table shows', () => {
+  assert.strictEqual(csvStatus(true), 'enabled');
+  assert.strictEqual(csvStatus(false), 'disabled');
+  assert.strictEqual(csvStatus(null), '');
+  assert.strictEqual(csvStatus(undefined), '');
+  // The table shows the same unknown state as an em dash; a sheet gets a blank.
+  assert.strictEqual(statusLabel(null), '—');
 });
 
 // --------------------------------------------------------- all-games export

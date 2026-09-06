@@ -97,7 +97,8 @@ functions it lifts:
 `parseMO2`, `parseModlist`, `buildRows`, `viewState`, `diffRows`,
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
-`isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
+`isUnendorsed`, `columnsIn`, `csvStatus`, `defaultProfileFor`,
+`gamesWithMods`, `allGamesRows`,
 `allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
@@ -130,9 +131,29 @@ needed a browser to catch. Keeping the decisions DOM-free is what makes them
 testable without adding a dependency or a build step to a single-file
 project.
 
+`columnsIn()` is the same idea applied across the outputs. Which optional
+columns a row set carries — order, size, collection, endorsement — is a
+decision the table, the CSV, the Markdown table and the BBCode list all have
+to reach the same answer on. They each used to ask in their own words, which
+is how a column ends up in an export that wasn't in the view it came from, so
+they now share one answer and one test.
+
 That leaves the wiring untested — whether a listener is attached, whether an
-element ID is right. Those fail loudly on first load rather than silently
-producing wrong output, which is why this trade is worth making.
+element ID is right. Most of those fail loudly on first load: a missing element
+throws, a missing listener means a button does nothing.
+
+Not all of them, though, and it is worth being honest about the one that got
+through. Loading a new file while the changes view was open reset `view` but
+none of the chrome that goes with it, so the summary bar read "4 changes" over
+a mod list. Nothing threw, nothing looked broken unless you had taken that
+exact path, and it shipped across several releases before anyone noticed. The
+trade is still the right one for a single file with no build step — but the
+reason it is worth making is that these bugs are *rare and cheap*, not that
+they are all loud.
+
+What actually catches them is driving the page: load a file, compare a second,
+switch views, export from each. Worth doing before a release that touched the
+render or view layer, since the suite deliberately cannot.
 
 One test is skipped unless you have local Vortex backups: if
 `%APPDATA%\Vortex\temp\state_backups_full\` holds two or more state files, it

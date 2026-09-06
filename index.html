@@ -992,8 +992,11 @@
     <div class="dz-sub">Vortex: state.json · startup.json · hourly.json — MO2: modlist.txt</div>
     <input type="file" id="fileInput" accept=".json,application/json,.txt,text/plain">
   </div>
-  <div class="status" id="status"></div>
-  <div class="freshness" id="freshness"></div>
+  <!-- The drop zones are operable from the keyboard, so the outcome of using
+       them has to be announced: without a live region, loading a file, or
+       failing to, happens in silence for a screen reader. -->
+  <div class="status" id="status" role="status"></div>
+  <div class="freshness" id="freshness" role="status"></div>
 
   <div class="controls" id="controls">
     <div class="field" id="gameField">
@@ -1037,9 +1040,10 @@
   <div class="diff-basis" id="diffBasis"></div>
 
   <div class="summary-bar" id="summaryBar">
-    <div class="count"><strong id="modCount">0</strong> <span id="countLabel">mods</span><span class="size-total" id="sizeTotal"></span></div>
+    <div class="count" role="status"><strong id="modCount">0</strong> <span id="countLabel">mods</span><span class="size-total" id="sizeTotal"></span></div>
     <div class="export-btns">
-      <select id="shareFormat" title="Format for the copy and text download buttons">
+      <select id="shareFormat" aria-label="Format for the copy and text download buttons"
+        title="Format for the copy and text download buttons">
         <option value="text">Plain text</option>
         <option value="markdown">Markdown</option>
         <option value="bbcode">BBCode</option>
@@ -1101,7 +1105,7 @@
 
   <div class="missing-note" id="missingNote"></div>
 
-  <div class="empty-note" id="emptyNote">No mods match the current filter.</div>
+  <div class="empty-note" id="emptyNote" role="status">No mods match the current filter.</div>
 
   <div class="compare-wrap" id="compareWrap">
     <div class="compare-lead">Compare against a second file to see what changed between them — added, removed, enabled/disabled, and version bumps.</div>
@@ -1110,7 +1114,7 @@
       <div class="dz-sub">an older or newer snapshot from the same mod manager</div>
       <input type="file" id="compareInput" accept=".json,application/json,.txt,text/plain">
     </div>
-    <div class="status" id="compareStatus"></div>
+    <div class="status" id="compareStatus" role="status"></div>
   </div>
 </div>
 
@@ -1179,27 +1183,30 @@
   // and the one thing that loads a file could not. A div with role=button
   // gets no key handling from the browser, so Enter and Space are wired up
   // here the way a real button would have given them for free.
-  function activateOnKey(zone, input){
+  // Both drop zones -- the primary one and the compare one -- behave the
+  // same: click or Enter/Space opens the picker, a drag highlights, a drop
+  // hands the first file over. They differ only in which handler receives it.
+  function wireDropZone(zone, input, onFile){
+    zone.addEventListener('click', () => input.click());
     zone.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' '){
         e.preventDefault(); // Space would otherwise scroll the page
         input.click();
       }
     });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag');
+      if (e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', e => {
+      if (e.target.files.length) onFile(e.target.files[0]);
+    });
   }
 
-  dropzone.addEventListener('click', () => fileInput.click());
-  activateOnKey(dropzone, fileInput);
-  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
-  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-  dropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropzone.classList.remove('drag');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener('change', e => {
-    if (e.target.files.length) handleFile(e.target.files[0]);
-  });
+  wireDropZone(dropzone, fileInput, handleFile);
 
   // The themes the picker offers, in the order it offers them. Inlined in a
   // function rather than held in a shared const so the test harness, which
@@ -1244,10 +1251,12 @@
   // The boot script may already have set this from storage; normalise it.
   applyTheme(document.documentElement.getAttribute('data-theme'));
 
-  function setStatus(msg, cls){
-    statusEl.textContent = msg;
-    statusEl.className = 'status' + (cls ? ' ' + cls : '');
+  // The load line and the compare line are the same control in two places.
+  function writeStatus(el, msg, cls){
+    el.textContent = msg;
+    el.className = 'status' + (cls ? ' ' + cls : '');
   }
+  function setStatus(msg, cls){ writeStatus(statusEl, msg, cls); }
 
   function showFreshness(file, staleMessage){
     const modified = new Date(file.lastModified);
@@ -1342,10 +1351,7 @@
     reader.readAsText(file);
   }
 
-  function setCompareStatus(msg, cls){
-    compareStatus.textContent = msg;
-    compareStatus.className = 'status' + (cls ? ' ' + cls : '');
-  }
+  function setCompareStatus(msg, cls){ writeStatus(compareStatus, msg, cls); }
 
   function handleFile(file){
     setStatus('Reading ' + file.name + ' …');
@@ -1360,7 +1366,8 @@
       currentDiff = [];
       setCompareStatus('');
       viewTabs.classList.remove('show');
-      view = 'list';
+      // The populate* call below renders; this only resets the chrome.
+      applyViewChrome(false);
 
       parsed = res.source;
       primaryFile = file;
@@ -1568,6 +1575,39 @@
     return rows;
   }
 
+  // Every cell in both tables is "make a td, maybe class it, maybe put text
+  // in it, hang it off the row". Text goes in as a text node, never as HTML:
+  // mod names come from mod authors, so nothing here is trusted markup.
+  function cell(tr, className, text){
+    const td = document.createElement('td');
+    if (className) td.className = className;
+    if (text !== undefined) td.textContent = text;
+    tr.appendChild(td);
+    return td;
+  }
+
+  // A badge is a classed span with its own text -- the enabled/disabled pill
+  // in the mod list and the added/removed/changed pill in the changes view
+  // are the same object with different words in it.
+  function badgeIn(parent, kind, text){
+    const span = document.createElement('span');
+    span.className = 'badge ' + kind;
+    span.textContent = text;
+    parent.appendChild(span);
+    return span;
+  }
+
+  // Both views finish by saying how many rows there are, showing the table if
+  // there are any and the empty note if there are not. Only the table element,
+  // the count and the wording of the note differ.
+  function showResults(tableEl, count, emptyText){
+    modCount.textContent = count;
+    emptyNote.textContent = emptyText;
+    tableEl.classList.toggle('show', count > 0);
+    emptyNote.classList.toggle('show', count === 0);
+    summaryBar.classList.add('show');
+  }
+
   function render(){
     if (!parsed) return;
 
@@ -1595,12 +1635,9 @@
     rows.forEach(r => {
       const tr = document.createElement('tr');
 
-      const ordTd = document.createElement('td');
-      ordTd.className = 'ord';
-      ordTd.textContent = typeof r.order === 'number' ? r.order : '';
-      tr.appendChild(ordTd);
+      cell(tr, 'ord', typeof r.order === 'number' ? r.order : '');
 
-      const nameTd = document.createElement('td');
+      const nameTd = cell(tr, null);
       const nameDiv = document.createElement('div');
       nameDiv.className = 'mod-name';
       nameDiv.textContent = r.name;
@@ -1611,20 +1648,11 @@
         idDiv.textContent = r.modId;
         nameTd.appendChild(idDiv);
       }
-      tr.appendChild(nameTd);
 
-      const verTd = document.createElement('td');
-      verTd.className = 'ver';
-      verTd.textContent = r.version;
-      tr.appendChild(verTd);
+      cell(tr, 'ver', r.version);
+      cell(tr, 'size', formatSize(r.size));
 
-      const sizeTd = document.createElement('td');
-      sizeTd.className = 'size';
-      sizeTd.textContent = formatSize(r.size);
-      tr.appendChild(sizeTd);
-
-      const collTd = document.createElement('td');
-      collTd.className = 'coll';
+      const collTd = cell(tr, 'coll');
       if (r.collections && r.collections.length){
         r.collections.forEach((entry, i) => {
           if (i) collTd.appendChild(document.createTextNode(', '));
@@ -1639,23 +1667,20 @@
       } else {
         collTd.textContent = '—';
       }
-      tr.appendChild(collTd);
 
-      const endoTd = document.createElement('td');
-      endoTd.className = 'endo';
-      endoTd.textContent = endorsementLabel(r.endorsed);
-      tr.appendChild(endoTd);
+      cell(tr, 'endo', endorsementLabel(r.endorsed));
 
-      const statTd = document.createElement('td');
+      const statTd = cell(tr, null);
       if (r.enabled === null){
-        statTd.innerHTML = '<span class="ver">—</span>';
+        const dash = document.createElement('span');
+        dash.className = 'ver';
+        dash.textContent = statusLabel(null);
+        statTd.appendChild(dash);
       } else {
-        statTd.innerHTML = '<span class="badge ' + (r.enabled ? 'on':'off') + '">' + (r.enabled ? 'enabled':'disabled') + '</span>';
+        badgeIn(statTd, r.enabled ? 'on' : 'off', statusLabel(r.enabled));
       }
-      tr.appendChild(statTd);
 
-      const srcTd = document.createElement('td');
-      srcTd.className = 'src';
+      const srcTd = cell(tr, 'src');
       if (r.sourceUrl){
         const a = document.createElement('a');
         a.href = r.sourceUrl;
@@ -1666,17 +1691,12 @@
       } else {
         srcTd.textContent = r.source;
       }
-      tr.appendChild(srcTd);
 
       tbody.appendChild(tr);
     });
 
-    modCount.textContent = rows.length;
     sizeTotal.textContent = view.sizeTotalText;
-    emptyNote.textContent = view.emptyNote;
-    table.classList.toggle('show', rows.length > 0);
-    emptyNote.classList.toggle('show', rows.length === 0);
-    summaryBar.classList.add('show');
+    showResults(table, rows.length, view.emptyNote);
     currentRows = rows;
 
     renderMissingMembers();
@@ -1765,22 +1785,14 @@
     shown.forEach(d => {
       const tr = document.createElement('tr');
 
-      const chgTd = document.createElement('td');
-      const badge = document.createElement('span');
-      badge.className = 'badge ' + d.change;
-      badge.textContent = d.change;
-      chgTd.appendChild(badge);
-      tr.appendChild(chgTd);
+      badgeIn(cell(tr, null), d.change, d.change);
 
-      const nameTd = document.createElement('td');
       const nameDiv = document.createElement('div');
       nameDiv.className = 'mod-name';
       nameDiv.textContent = d.row.name;
-      nameTd.appendChild(nameDiv);
-      tr.appendChild(nameTd);
+      cell(tr, null).appendChild(nameDiv);
 
-      const detTd = document.createElement('td');
-      detTd.className = 'chg';
+      const detTd = cell(tr, 'chg');
       if (d.change === 'changed'){
         d.changes.forEach((c, i) => {
           if (i) detTd.appendChild(document.createTextNode('  ·  '));
@@ -1801,7 +1813,6 @@
         bits.push(statusLabel(d.row.enabled));
         detTd.textContent = bits.join('  ·  ');
       }
-      tr.appendChild(detTd);
 
       diffTableBody.appendChild(tr);
     });
@@ -1828,24 +1839,25 @@
     });
     diffBasis.classList.add('show');
 
-    modCount.textContent = shown.length;
     // 'changes' would be wrong when unchanged rows are being listed too.
     const listingUnchanged = active.has('unchanged') && counts.unchanged > 0;
     countLabel.textContent = listingUnchanged
       ? (shown.length === 1 ? 'row' : 'rows')
       : (shown.length === 1 ? 'change' : 'changes');
     const anyDifference = counts.added + counts.removed + counts.changed > 0;
-    emptyNote.textContent = anyDifference
+    showResults(diffTable, shown.length, anyDifference
       ? 'No changes match the current filter.'
-      : 'No differences between these two files.';
-    diffTable.classList.toggle('show', shown.length > 0);
-    emptyNote.classList.toggle('show', shown.length === 0);
-    summaryBar.classList.add('show');
+      : 'No differences between these two files.');
   }
 
-  function setView(v){
-    view = v;
-    const isDiff = v === 'diff';
+  // Everything a view owns except drawing it: which tab is lit, which tables
+  // and controls belong on screen, and what the summary bar counts. Split out
+  // because loading a new file also has to reset all of this, and it used to
+  // do it by assigning `view` and hoping -- which left "4 changes" over a mod
+  // list, and the changes tab still lit, whenever a file was dropped while
+  // the comparison was open.
+  function applyViewChrome(isDiff){
+    view = isDiff ? 'diff' : 'list';
     viewListBtn.classList.toggle('active', !isDiff);
     viewDiffBtn.classList.toggle('active', isDiff);
     if (isDiff){
@@ -1855,7 +1867,6 @@
       sizeTotal.textContent = '';
       missingNote.classList.remove('show');
       showBulkExport(false);
-      renderDiff();
     } else {
       diffTable.classList.remove('show');
       diffBasis.classList.remove('show');
@@ -1863,8 +1874,12 @@
       controls.classList.add('show');
       countLabel.textContent = 'mods';
       emptyNote.textContent = 'No mods match the current filter.';
-      render();
     }
+  }
+
+  function setView(v){
+    applyViewChrome(v === 'diff');
+    refresh();
   }
 
   // Route re-renders through the active view.
@@ -1880,21 +1895,19 @@
   viewListBtn.addEventListener('click', () => setView('list'));
   viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
 
-  compareZone.addEventListener('click', () => compareInput.click());
-  activateOnKey(compareZone, compareInput);
-  compareZone.addEventListener('dragover', e => { e.preventDefault(); compareZone.classList.add('drag'); });
-  compareZone.addEventListener('dragleave', () => compareZone.classList.remove('drag'));
-  compareZone.addEventListener('drop', e => {
-    e.preventDefault();
-    compareZone.classList.remove('drag');
-    if (e.dataTransfer.files.length) handleCompareFile(e.dataTransfer.files[0]);
-  });
-  compareInput.addEventListener('change', e => {
-    if (e.target.files.length) handleCompareFile(e.target.files[0]);
-  });
+  wireDropZone(compareZone, compareInput, handleCompareFile);
 
   function exportBaseName(){
     return (parsed && parsed.type === 'mo2') ? 'mo2-modlist' : 'vortex-modlist';
+  }
+
+  // Exports of the changes view are named for it, whatever their format.
+  function exportName(ext){
+    return exportBaseName() + (view === 'diff' ? '-changes' : '') + ext;
+  }
+
+  function downloadCsv(filename, lines){
+    download(filename, lines.join('\n'), 'text/csv');
   }
 
   function download(filename, content, mime){
@@ -1972,10 +1985,7 @@
   function markdownLines(rows){
     const list = rows || [];
     if (!list.length) return [];
-    const withOrder = list.some(r => typeof r.order === 'number');
-    const withSize = list.some(r => typeof r.size === 'number');
-    const withColl = list.some(r => r.collectionText);
-    const withEndo = list.some(r => r.endorsed !== undefined && r.endorsed !== null);
+    const { order: withOrder, size: withSize, coll: withColl, endo: withEndo } = columnsIn(list);
 
     const cols = (withOrder ? [['#', '--:']] : [])
       .concat([['Mod', '---'], ['Version', '---']],
@@ -2009,7 +2019,7 @@
   function bbcodeLines(rows){
     const list = rows || [];
     if (!list.length) return [];
-    const withOrder = list.some(r => typeof r.order === 'number');
+    const withOrder = columnsIn(list).order;
     const out = ['[list]'];
     list.forEach(r => {
       const prefix = withOrder && typeof r.order === 'number' ? r.order + '. ' : '';
@@ -2191,10 +2201,7 @@
 
     // Only MO2 files carry a verified order; only Vortex files carry sizes
     // and collections. Each column hides where the data doesn't exist.
-    const hasOrder = unfiltered.some(r => typeof r.order === 'number');
-    const hasSize = unfiltered.some(r => typeof r.size === 'number');
-    const hasColl = unfiltered.some(r => r.collectionText);
-    const hasEndo = unfiltered.some(r => r.endorsed !== undefined && r.endorsed !== null);
+    const { order: hasOrder, size: hasSize, coll: hasColl, endo: hasEndo } = columnsIn(unfiltered);
 
     // Falling back rather than sorting by a field that isn't there.
     let sort = options.sort || 'name';
@@ -2286,6 +2293,26 @@
     return enabled === null || enabled === undefined ? '—' : (enabled ? 'enabled' : 'disabled');
   }
 
+  // The one place that decides which optional columns a row set carries. The
+  // table, the CSV, the Markdown table and the BBCode list all have to agree
+  // about this, and they used to each ask in their own words -- so a column
+  // could appear in an export and not the view it was exported from.
+  function columnsIn(rows){
+    const list = rows || [];
+    return {
+      order: list.some(r => typeof r.order === 'number'),
+      size: list.some(r => typeof r.size === 'number'),
+      coll: list.some(r => r.collectionText),
+      endo: list.some(r => r.endorsed !== undefined && r.endorsed !== null),
+    };
+  }
+
+  // Status as a CSV cell: an unknown state is left empty rather than written
+  // as the em dash the table shows, since a spreadsheet should see a blank.
+  function csvStatus(enabled){
+    return enabled === null || enabled === undefined ? '' : (enabled ? 'enabled' : 'disabled');
+  }
+
   // Compares two row sets keyed by modId (which is the mod name for MO2).
   // Direction is oldest -> newest by file timestamp, so 'added' means the mod
   // is present in the newer file only.
@@ -2327,7 +2354,7 @@
 
   // currentRows is whatever the table is showing, so exports match the view.
   function exportHasOrder(){
-    return currentRows.some(r => typeof r.order === 'number');
+    return columnsIn(currentRows).order;
   }
 
   // Plain-text rendering of what changed. Empty for added/removed rows,
@@ -2360,29 +2387,25 @@
         lines.push([d.change, d.row.name, d.row.version, statusLabel(d.row.enabled), diffDetail(d)]
           .map(csvCell).join(','));
       });
-      download(exportBaseName() + '-changes.csv', lines.join('\n'), 'text/csv');
+      downloadCsv(exportName('.csv'), lines);
       return;
     }
-    const withOrder = exportHasOrder();
-    const withSize = currentRows.some(r => typeof r.size === 'number');
-    const withColl = currentRows.some(r => r.collectionText);
-    const withEndo = currentRows.some(r => r.endorsed !== undefined && r.endorsed !== null);
+    const { order: withOrder, size: withSize, coll: withColl, endo: withEndo } = columnsIn(currentRows);
     const header = (withOrder ? ['#'] : [])
       .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [],
         withColl ? ['From collection'] : [], withEndo ? ['Endorsed'] : [],
         ['Status','Source','Source URL']);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
-      const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
       const fields = (withOrder ? [typeof r.order === 'number' ? r.order : ''] : [])
         .concat([r.name, r.version],
           withSize ? [formatSize(r.size), typeof r.size === 'number' ? r.size : ''] : [],
           withColl ? [r.collectionText || ''] : [],
           withEndo ? [endorsementLabel(r.endorsed)] : [],
-          [status, r.source, r.sourceUrl || '']);
+          [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
-    download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
+    downloadCsv(exportName('.csv'), lines);
   });
 
   bulkBtn.addEventListener('click', () => setGamePickerOpen(gamePicker.hidden));
@@ -2417,12 +2440,12 @@
         r.game, r.name, r.version,
         formatSize(r.size), typeof r.size === 'number' ? r.size : '',
         r.collectionText || '', endorsementLabel(r.endorsed),
-        r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled'),
+        csvStatus(r.enabled),
         r.source, r.sourceUrl || '',
       ].map(csvCell).join(','));
     });
     setGamePickerOpen(false);
-    download(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines.join('\n'), 'text/csv');
+    downloadCsv(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines);
   });
 
   // BBCode has no file extension anyone agrees on, and it is pasted into a
@@ -2451,7 +2474,7 @@
   updateShareLabels();
 
   txtBtn.addEventListener('click', () => {
-    download(exportBaseName() + (view === 'diff' ? '-changes' : '') + SHARE_EXT[shareFormat.value],
+    download(exportName(SHARE_EXT[shareFormat.value]),
       shareLines().join('\n'), SHARE_MIME[shareFormat.value]);
   });
 
