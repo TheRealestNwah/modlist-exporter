@@ -42,12 +42,12 @@ jobs:
       # Called from release.yml it resolves to the commit that workflow was
       # dispatched against, which is the same commit it just tagged. Either
       # way the deployed site is exactly the released code.
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
         with:
           enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: '.'
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
