@@ -1477,7 +1477,6 @@
       compareFile = null;
       currentDiff = [];
       setCompareStatus('');
-      viewTabs.classList.remove('show');
       // The populate* call below renders; this only resets the chrome.
       applyViewChrome('list');
 
@@ -1485,6 +1484,7 @@
       primaryFile = file;
       setStatus('Loaded ' + file.name + ' ✓', 'ok');
       showFreshness(file, STALE_NOTE[parsed.type]);
+      updateTabs();
       if (parsed.type === 'mo2') populateMO2(); else populateGames();
       compareWrap.classList.add('show');
     }, msg => setStatus(msg, 'err'));
@@ -1505,7 +1505,7 @@
       compareSource = res.source;
       compareFile = file;
       setCompareStatus('Comparing against ' + file.name + ' ✓', 'ok');
-      viewTabs.classList.add('show');
+      updateTabs();
       setView('diff');
     }, msg => setCompareStatus(msg, 'err'));
   }
@@ -1739,9 +1739,6 @@
     table.classList.toggle('no-coll', !view.hasColl);
     table.classList.toggle('no-endo', !view.hasEndo);
     table.classList.toggle('no-when', !view.hasWhen);
-    // MO2's modlist.txt has no plugins in it at all, so the tab would be a
-    // dead end there rather than an explanation.
-    viewOrderBtn.hidden = !parsed || parsed.type !== 'vortex';
     sortInstalledOption.hidden = !view.hasWhen;
     notEndorsedField.style.display = view.hasEndo ? '' : 'none';
     // Only worth offering when there's more than one game to combine.
@@ -1987,6 +1984,17 @@
   // the comparison was open.
   // Owns every piece of chrome that differs between the three views, so a
   // view change can never leave one view's furniture standing in another's.
+  // Which views the loaded file (or files) can actually offer. The tab bar is
+  // only worth showing when there is somewhere else to go, and a tab is only
+  // worth showing when it leads somewhere: Changes needs a second file to
+  // compare against, and MO2's modlist.txt has no plugins in it at all, so a
+  // load order tab would be a dead end there rather than an explanation. A
+  // Vortex file always offers the tab -- the view itself says so when the
+  // chosen game has no order recorded.
+  function availableViews(sourceType, hasCompare){
+    return { diff: !!hasCompare, order: sourceType === 'vortex' };
+  }
+
   function applyViewChrome(next){
     view = (next === 'diff' || next === 'order') ? next : 'list';
     viewListBtn.classList.toggle('active', view === 'list');
@@ -2018,6 +2026,18 @@
       countLabel.textContent = 'mods';
       emptyNote.textContent = 'No mods match the current filter.';
     }
+  }
+
+  // Called whenever the inputs to availableViews change -- a file loaded, a
+  // comparison added or dropped. It lived in render() before, which meant the
+  // Load order tab was only ever revealed by loading a comparison file: the
+  // button was un-hidden correctly but its container stayed display:none, so
+  // the view was unreachable for anyone who did not also use the diff.
+  function updateTabs(){
+    const avail = availableViews(parsed && parsed.type, !!compareSource);
+    viewDiffBtn.hidden = !avail.diff;
+    viewOrderBtn.hidden = !avail.order;
+    viewTabs.classList.toggle('show', avail.diff || avail.order);
   }
 
   function setView(v){
