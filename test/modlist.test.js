@@ -882,7 +882,7 @@ test('diff exports escape a hostile name in both formats', () => {
 // --------------------------------------------------------------- theming
 
 test('themeIds: the picker offers exactly the themes that have a block', () => {
-  assert.deepStrictEqual(themeIds(), ['midnight', 'nexus', 'glass']);
+  assert.deepStrictEqual(themeIds(), ['midnight', 'vortex', 'nmm', 'glass']);
 });
 
 test('resolveTheme: a known id passes through', () => {
@@ -892,8 +892,9 @@ test('resolveTheme: a known id passes through', () => {
 test('resolveTheme: anything unrecognised falls back to the default', () => {
   // What comes out of storage is whatever was last written there, including by
   // an older version of this file. A value with no block behind it would leave
-  // the page unstyled rather than merely wrong.
-  ['', 'sepia', 'MIDNIGHT', ' glass', null, undefined, 0, {}].forEach((bad) => {
+  // the page unstyled rather than merely wrong -- 'nexus' is the theme's own
+  // former id, from before it was renamed to 'vortex'.
+  ['', 'sepia', 'nexus', 'MIDNIGHT', ' glass', null, undefined, 0, {}].forEach((bad) => {
     assert.strictEqual(resolveTheme(bad), 'midnight', JSON.stringify(bad) + ' should fall back');
   });
 });
@@ -909,9 +910,12 @@ test('themeMeta: every theme declares a colour scheme and a chrome colour', () =
 test('themeMeta: the light theme is the only one asking for light controls', () => {
   // Native checkboxes and the select chevron follow color-scheme, not our
   // variables -- getting this wrong paints a dark checkbox on a white page.
+  // Looping rather than naming the dark ones means a future dark theme is
+  // covered here without anyone remembering to add it.
   assert.strictEqual(themeMeta('glass').colorScheme, 'light');
-  assert.strictEqual(themeMeta('midnight').colorScheme, 'dark');
-  assert.strictEqual(themeMeta('nexus').colorScheme, 'dark');
+  themeIds().filter((id) => id !== 'glass').forEach((id) => {
+    assert.strictEqual(themeMeta(id).colorScheme, 'dark', id + ' should be dark');
+  });
 });
 
 test('themeMeta: an unknown theme gets the default metadata, not undefined', () => {

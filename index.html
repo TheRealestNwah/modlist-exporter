@@ -369,11 +369,12 @@
   }
   .empty-note.show{ display:block; }
 
-  /* --- Nexus -------------------------------------------------------------
-     Near-black cool charcoal with amber calls to action. The recognisable
-     part is the solid amber fill with a near-black label, which is what a
-     primary action looks like on the site; --on-accent carries that. */
-  [data-theme="nexus"]{
+  /* --- Vortex -------------------------------------------------------------
+     Near-black cool charcoal with amber calls to action, mirroring Vortex's
+     own dark UI. The recognisable part is the solid amber fill with a
+     near-black label, which is what a primary action looks like there;
+     --on-accent carries that. */
+  [data-theme="vortex"]{
     --bg: #101114;
     --panel: #191b1f;
     --panel-2: #22252a;
@@ -400,9 +401,101 @@
   }
   /* A solid amber button carries its label at a heavier weight than a tinted
      one needs, or the near-black text reads thin against it. */
-  [data-theme="nexus"] .export-btns button,
-  [data-theme="nexus"] .view-tabs button.active{ font-weight: 600; }
-  [data-theme="nexus"] .export-btns button:hover{ background: #f7b52e; }
+  [data-theme="vortex"] .export-btns button,
+  [data-theme="vortex"] .view-tabs button.active{ font-weight: 600; }
+  [data-theme="vortex"] .export-btns button:hover{ background: #f7b52e; }
+
+  /* --- NMM ------------------------------------------------------------
+     Nexus Mod Manager: the desktop app most Skyrim modders used before
+     Vortex existed, and the one this whole tool is implicitly a spiritual
+     replacement for. Two things carry the period: gloss (a light-to-dark
+     gradient with a bright top edge) on anything clickable, and a sunken
+     bevel on anything you type into or choose from -- standard for
+     2008-2014 desktop chrome, and both long gone from anything made today.
+     The accent is the lime green Nexus used before its current teal and
+     orange branding, which is also what the old forums linked in. */
+  [data-theme="nmm"]{
+    --bg: #1c1c1c;
+    --panel: #262626;
+    --panel-2: #2f2f2f;
+    --line: #3a3a3a;
+    --ink: #d6d6d6;
+    --ink-dim: #8f8f8f;
+    --accent: #8dc73f;
+    --accent-dim: #6fa62c;
+    --good: #59b34a;
+    --bad: #cc3b3b;
+    --good-tint: rgba(89,179,74,0.16);
+    --good-edge: rgba(89,179,74,0.30);
+    --bad-tint: rgba(204,59,59,0.16);
+    --bad-edge: rgba(204,59,59,0.30);
+    --accent-tint: rgba(141,199,63,0.20);
+    --accent-ink: #b9e26c;
+    --on-accent: #16220a;
+    --on-good: #0e1c0a;
+    --thead-bg: linear-gradient(to bottom, #333333, #242424);
+    --r-control: 3px;
+    --r-btn: 3px;
+    --r-badge: 3px;
+    --r-panel: 3px;
+    --r-drop: 3px;
+    --sans: Tahoma, Verdana, 'Segoe UI', Arial, sans-serif;
+    --mono: 'Courier New', Courier, monospace;
+  }
+  /* Gloss: a vertical gradient, a bright inset top edge, and a hard 1px
+     border a shade darker at the bottom than the top -- the standard
+     "Web 2.0 button" build, on every solid fill in this theme. Dark text on
+     a bright button reads as engraved with a faint light shadow beneath it,
+     the same trick in reverse from the light-text-on-dark-shadow below. */
+  [data-theme="nmm"] .export-btns button{
+    background: linear-gradient(to bottom, #a7dd55, #7cb32e);
+    border: 1px solid #4f7a1f;
+    border-bottom-color: #3f6119;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+  }
+  [data-theme="nmm"] .export-btns button:hover{
+    background: linear-gradient(to bottom, #b8ea66, #8cc23d);
+  }
+  [data-theme="nmm"] .export-btns button.copied{
+    background: linear-gradient(to bottom, #79c469, #4a9a3c);
+    border-color: #2f6b24;
+    border-bottom-color: #26591d;
+  }
+  [data-theme="nmm"] .view-tabs button.active{
+    background: linear-gradient(to bottom, #a7dd55, #7cb32e);
+    border-color: #4f7a1f;
+    color: var(--on-accent);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+  }
+  /* Sunken bevel: gloss turned inside out, for anything you type into or
+     choose from -- the inset shadow is what reads as "recessed" rather than
+     "raised". The grid header gets a gradient instead of a bevel, since
+     NMM's own mod list was exactly this control: a WinForms ListView. */
+  [data-theme="nmm"] select,
+  [data-theme="nmm"] #searchInput,
+  [data-theme="nmm"] .toggle-btn{
+    background: #141414;
+    border: 1px solid #000;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+  }
+  [data-theme="nmm"] thead th{
+    border-bottom: 1px solid #000;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  /* Alternating row shading was how a dense grid stayed readable without
+     colour-coding every column; the hover tint nods at Windows' selection
+     highlight without borrowing its blue. */
+  [data-theme="nmm"] tbody tr:nth-child(even){ background: rgba(255,255,255,0.02); }
+  [data-theme="nmm"] tbody tr:hover{ background: rgba(141,199,63,0.10); }
+  [data-theme="nmm"] .dropzone{ box-shadow: inset 0 1px 4px rgba(0,0,0,0.6); }
+  [data-theme="nmm"] h1{ text-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+  /* A period-correct scrollbar. Firefox has no equivalent hook and keeps its
+     own rather than falling back to something wrong. */
+  [data-theme="nmm"] ::-webkit-scrollbar{ width: 14px; height: 14px; }
+  [data-theme="nmm"] ::-webkit-scrollbar-track{ background: #1a1a1a; }
+  [data-theme="nmm"] ::-webkit-scrollbar-thumb{ background: #3a3a3a; border: 1px solid #000; }
+  [data-theme="nmm"] ::-webkit-scrollbar-thumb:hover{ background: #4a4a4a; }
 
   /* --- Liquid Glass ------------------------------------------------------
      Translucent material over a lit background, rather than flat fills. Three
@@ -599,7 +692,8 @@
         <label for="themeSelect">Theme</label>
         <select id="themeSelect">
           <option value="midnight">Midnight</option>
-          <option value="nexus">Nexus</option>
+          <option value="vortex">Vortex</option>
+          <option value="nmm">NMM</option>
           <option value="glass">Liquid Glass</option>
         </select>
       </div>
@@ -834,7 +928,7 @@
   // function rather than held in a shared const so the test harness, which
   // lifts these out one at a time, does not need the surrounding scope.
   function themeIds(){
-    return ['midnight', 'nexus', 'glass'];
+    return ['midnight', 'vortex', 'nmm', 'glass'];
   }
 
   // Anything unrecognised falls back to the default rather than leaving the
@@ -850,7 +944,8 @@
   // otherwise an unchecked box on the light theme paints as a dark square.
   function themeMeta(theme){
     const id = resolveTheme(theme);
-    if (id === 'nexus') return { colorScheme: 'dark', themeColor: '#101114' };
+    if (id === 'vortex') return { colorScheme: 'dark', themeColor: '#101114' };
+    if (id === 'nmm') return { colorScheme: 'dark', themeColor: '#1c1c1c' };
     if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
     return { colorScheme: 'dark', themeColor: '#16141c' };
   }
