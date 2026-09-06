@@ -38,6 +38,9 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   `modlist.txt` records no sizes)
 - **File freshness check** — flags when the loaded file is more than a
   couple days old, so you don't export a stale list without realizing it
+- **Auto-refresh** — on Chromium browsers, keep watching the file you loaded
+  and reload it here whenever your mod manager writes to it, without losing
+  your game, profile, view or loaded comparison
 - **Compare two snapshots** — load a second file to see what changed between
   them: added, removed, enabled/disabled, version bumps, and priority moves
 - Export as CSV, plain `.txt`, or copy straight to clipboard (the changes
@@ -347,6 +350,36 @@ that case only additions, removals and version changes are reported, and
 the comparison says so. This matters because treating "unknown" as a change
 would otherwise mark every single mod as modified.
 
+## Auto-refresh
+
+Choose a file with the picker (or drag one in) on a Chromium browser — Chrome,
+Edge, Opera, Brave — and an **Auto-refresh** checkbox appears under the
+freshness line. Tick it and the page keeps re-reading that same file, so
+installing a mod in Vortex and switching back to this tab shows the new list
+without loading anything again. The choice is remembered, so the next file you
+load starts watching straight away.
+
+It works because the File System Access API hands back a handle that stays
+pointed at the file, which is also why it is Chromium-only: Firefox and Safari
+have no picker that returns one, and there the checkbox simply never appears.
+Dragging a file in gets a handle too, on the same browsers.
+
+There is no change event to subscribe to, so watching is polling: every four
+seconds the page asks the handle for the file's timestamp, which reads
+metadata rather than contents. The file is re-parsed only when that timestamp
+moves — and note it is the file's own timestamp, so it catches Vortex
+rewriting `startup.json` in place, but not a *different* file becoming the
+newest backup.
+
+A refresh is meant to be unremarkable: whatever game, profile and view you
+were looking at stay put, and a loaded comparison is recomputed against the
+new contents rather than thrown away. If the file is renamed, deleted, or
+access to it lapses, watching stops and says so instead of quietly going
+stale.
+
+Nothing about this reaches the network. The file is read from disk by the
+browser, in the tab, exactly as it is when you load one by hand.
+
 ## Notes on file locations
 
 ### Vortex
@@ -424,9 +457,11 @@ comparable ordering.
 - [x] Endorsement status, with a filter for mods not yet endorsed
 - [x] Export every Vortex game at once, in one CSV
 - [x] Markdown / BBCode export, for sharing a load order on a forum
+- [x] Auto-refresh via the File System Access API, where the browser has one
 - [ ] Surface Vortex load order when present in the state file
       (game-extension dependent)
-- [ ] Folder-watch / auto-refresh via the File System Access API
+- [ ] Watch a whole folder, so the newest Vortex backup is picked up without
+      choosing a file at all
 
 ## AI disclosure
 
