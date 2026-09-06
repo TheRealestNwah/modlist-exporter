@@ -81,6 +81,7 @@
     cursor: pointer;
     transition: border-color .15s ease, background .15s ease;
   }
+  .dropzone:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
   .dropzone:hover, .dropzone.drag{
     border-color: var(--accent);
     background: var(--panel-2);
@@ -370,7 +371,7 @@
     </details>
   </header>
 
-  <div class="dropzone" id="dropzone">
+  <div class="dropzone" id="dropzone" role="button" tabindex="0">
     <div class="dz-title">Click to choose a file, or drag one here</div>
     <div class="dz-sub">Vortex: state.json · startup.json · hourly.json — MO2: modlist.txt</div>
     <input type="file" id="fileInput" accept=".json,application/json,.txt,text/plain">
@@ -471,7 +472,7 @@
 
   <div class="compare-wrap" id="compareWrap">
     <div class="compare-lead">Compare against a second file to see what changed between them — added, removed, enabled/disabled, and version bumps.</div>
-    <div class="dropzone" id="compareZone">
+    <div class="dropzone" id="compareZone" role="button" tabindex="0">
       <div class="dz-title">Click to choose a file to compare, or drag one here</div>
       <div class="dz-sub">an older or newer snapshot from the same mod manager</div>
       <input type="file" id="compareInput" accept=".json,application/json,.txt,text/plain">
@@ -532,7 +533,23 @@
   let visibleDiff = [];   // what the change-type filters actually show
   let view = 'list';        // 'list' | 'diff'
 
+  // Both zones are divs driving a display:none file input, so neither was
+  // reachable by keyboard: the div was never in the tab order and the input
+  // was taken out of it. Every filter and export control could be tabbed to,
+  // and the one thing that loads a file could not. A div with role=button
+  // gets no key handling from the browser, so Enter and Space are wired up
+  // here the way a real button would have given them for free.
+  function activateOnKey(zone, input){
+    zone.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault(); // Space would otherwise scroll the page
+        input.click();
+      }
+    });
+  }
+
   dropzone.addEventListener('click', () => fileInput.click());
+  activateOnKey(dropzone, fileInput);
   dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
   dropzone.addEventListener('drop', e => {
@@ -1123,6 +1140,7 @@
   viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
 
   compareZone.addEventListener('click', () => compareInput.click());
+  activateOnKey(compareZone, compareInput);
   compareZone.addEventListener('dragover', e => { e.preventDefault(); compareZone.classList.add('drag'); });
   compareZone.addEventListener('dragleave', () => compareZone.classList.remove('drag'));
   compareZone.addEventListener('drop', e => {
