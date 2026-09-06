@@ -251,10 +251,11 @@ Four, picked from the header and remembered in `localStorage` per browser:
 - **Vortex** — near-black with amber calls to action, in the spirit of the
   app's own dark UI.
 - **NMM** — Nexus Mod Manager, the desktop app most Skyrim modders used
-  before Vortex existed. Gloss on every button, a sunken bevel on every field,
-  a ListView-style grid header, and the lime green Nexus used before its
-  current teal-and-orange branding. 2008–2014 Windows desktop chrome, not
-  anything made since.
+  before Vortex existed. It was a plain .NET WinForms utility rather than a
+  branded app, so this is light grey chrome, a white grid with thin
+  gridlines, near-square corners, and a Windows-blue selection highlight —
+  closer to Explorer or classic uTorrent than to a website. Nexus green shows
+  up only where the real app used it: the activated-mod checkmark.
 - **Liquid Glass** — light and translucent: surfaces blur what is behind them,
   over a lit background that gives them something to refract.
 
@@ -262,8 +263,8 @@ A theme is a block of custom properties. Colour, the tints behind badges and
 notices, the text that sits on a solid fill, and the corner radii are all
 tokens on `:root`, so a theme mostly restates values rather than rewriting
 rules — Vortex is about 30 lines as a result. NMM and Liquid Glass are the two
-that add rules of their own: gloss and bevel for NMM, blur and a bright inner
-edge for Liquid Glass.
+that add rules of their own: a flat button that goes Windows-Aero-blue on
+hover and focus for NMM, blur and a bright inner edge for Liquid Glass.
 
 Two details that are easy to miss:
 

@@ -907,15 +907,16 @@ test('themeMeta: every theme declares a colour scheme and a chrome colour', () =
   });
 });
 
-test('themeMeta: the light theme is the only one asking for light controls', () => {
+test('themeMeta: color-scheme matches whether each theme is actually light or dark', () => {
   // Native checkboxes and the select chevron follow color-scheme, not our
-  // variables -- getting this wrong paints a dark checkbox on a white page.
-  // Looping rather than naming the dark ones means a future dark theme is
-  // covered here without anyone remembering to add it.
-  assert.strictEqual(themeMeta('glass').colorScheme, 'light');
-  themeIds().filter((id) => id !== 'glass').forEach((id) => {
-    assert.strictEqual(themeMeta(id).colorScheme, 'dark', id + ' should be dark');
-  });
+  // variables -- getting this wrong paints a dark checkbox on a white page,
+  // or a white one on a dark page. There is no shortcut like "only the light
+  // theme is light": NMM is a light theme too, so this has to be a mapping
+  // per id rather than one name singled out and everything else assumed dark.
+  assert.deepStrictEqual(
+    Object.fromEntries(themeIds().map((id) => [id, themeMeta(id).colorScheme])),
+    { midnight: 'dark', vortex: 'dark', nmm: 'light', glass: 'light' }
+  );
 });
 
 test('themeMeta: an unknown theme gets the default metadata, not undefined', () => {
