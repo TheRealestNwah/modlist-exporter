@@ -44,8 +44,9 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   view exports too, as `*-changes.csv` / `*-changes.txt`)
 - **Markdown and BBCode** — a format picker next to the export buttons, for
   posting a load order on a forum, a wiki, or in a repo
-- **Four themes** — Midnight, Vortex, NMM and Liquid Glass, picked in the
-  header and remembered per browser
+- **Seven themes** — Midnight, Vortex, NMM, Liquid Glass, UESP, and a
+  Fallout 3 / New Vegas terminal pair, picked in the header and remembered
+  per browser
 - **All-games export** — every Vortex game in one CSV with a `Game` column,
   for when you want the whole setup rather than one game at a time
 
@@ -207,7 +208,7 @@ changes, and matching noise there would be worse than the signal.
 
 ## Themes
 
-Four, picked from the header and remembered in `localStorage` per browser:
+Seven, picked from the header and remembered in `localStorage` per browser:
 
 - **Midnight** — the default. Dark, violet accent.
 - **Vortex** — near-black with amber calls to action, in the spirit of the
@@ -220,13 +221,34 @@ Four, picked from the header and remembered in `localStorage` per browser:
   up only where the real app used it: the activated-mod checkmark.
 - **Liquid Glass** — light and translucent: surfaces blur what is behind them,
   over a lit background that gives them something to refract.
+- **UESP** — a MediaWiki skin, not an app. Off-white page, boxed cells with
+  the exact grey MediaWiki's own `wikitable` class uses, and the classic
+  wiki-blue link colour that predates Wikipedia's current palette. Links are
+  underlined outright rather than on hover, which every other theme here
+  deliberately doesn't do.
+- **Fallout 3 terminal** — a monochrome CRT readout: green phosphor on
+  black, square corners, a scanline-and-vignette overlay, and every
+  clickable thing in brackets the way a terminal menu option reads as
+  `[ CONTINUE ]`. Chrome — headings, table headers, buttons, badges — is
+  set in caps; the mod list itself stays as typed, since a long list set
+  entirely in capitals is real data made harder to scan, not more
+  authentic.
+- **New Vegas terminal** — the same terminal, in amber rather than green:
+  the other classic CRT phosphor colour, so it's a genuine alternate rather
+  than the same theme renamed. Both terminal themes keep red for a disabled
+  mod — a monochrome screen can still carry a second colour for an alert,
+  the way a terminal's own warning text would.
 
 A theme is a block of custom properties. Colour, the tints behind badges and
 notices, the text that sits on a solid fill, and the corner radii are all
 tokens on `:root`, so a theme mostly restates values rather than rewriting
-rules — Vortex is about 30 lines as a result. NMM and Liquid Glass are the two
-that add rules of their own: a flat button that goes Windows-Aero-blue on
-hover and focus for NMM, blur and a bright inner edge for Liquid Glass.
+rules — Vortex is about 30 lines as a result. NMM, Liquid Glass, UESP and the
+two terminals are the ones that add rules of their own: a flat button that
+goes Windows-Aero-blue on hover and focus for NMM, blur and a bright inner
+edge for Liquid Glass, boxed `wikitable`-style cells for UESP, and brackets,
+caps and a scanline overlay for the terminals — the two terminals share that
+structural CSS in one rule and differ only in their colour tokens, which is
+what makes New Vegas a real "alternate" rather than a duplicate.
 
 Two details that are easy to miss:
 

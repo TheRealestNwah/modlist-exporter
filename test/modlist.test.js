@@ -882,7 +882,7 @@ test('diff exports escape a hostile name in both formats', () => {
 // --------------------------------------------------------------- theming
 
 test('themeIds: the picker offers exactly the themes that have a block', () => {
-  assert.deepStrictEqual(themeIds(), ['midnight', 'vortex', 'nmm', 'glass']);
+  assert.deepStrictEqual(themeIds(), ['midnight', 'vortex', 'nmm', 'glass', 'uesp', 'fo3', 'nv']);
 });
 
 test('resolveTheme: a known id passes through', () => {
@@ -915,7 +915,8 @@ test('themeMeta: color-scheme matches whether each theme is actually light or da
   // per id rather than one name singled out and everything else assumed dark.
   assert.deepStrictEqual(
     Object.fromEntries(themeIds().map((id) => [id, themeMeta(id).colorScheme])),
-    { midnight: 'dark', vortex: 'dark', nmm: 'light', glass: 'light' }
+    { midnight: 'dark', vortex: 'dark', nmm: 'light', glass: 'light',
+      uesp: 'light', fo3: 'dark', nv: 'dark' }
   );
 });
 
