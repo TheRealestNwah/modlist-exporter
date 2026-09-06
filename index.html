@@ -372,6 +372,12 @@
   .coll, .endo{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); }
   .endo{ white-space: nowrap; }
   #modTable.no-endo th.endo-col, #modTable.no-endo td.endo{ display: none; }
+  .when{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim); white-space: nowrap; }
+  #modTable.no-when th.when-col, #modTable.no-when td.when{ display: none; }
+  /* How many other installed mods came off the same Nexus page. Muted, because
+     it is context rather than a warning: one page legitimately ships several
+     files, and each installs as its own mod. */
+  .siblings{ opacity: .65; }
   .missing-note{
     display: none;
     margin-top: 18px;
@@ -1016,6 +1022,7 @@
       <select id="sortSelect">
         <option value="name">Name (A–Z)</option>
         <option value="size">Size (largest first)</option>
+        <option value="installed" id="sortInstalledOption">Recently installed</option>
         <option value="order" id="sortOrderOption">MO2 priority order</option>
       </select>
     </div>
@@ -1080,6 +1087,7 @@
         <th>Mod</th>
         <th>Version</th>
         <th class="size-col">Size</th>
+        <th class="when-col" title="When Vortex installed this mod">Installed</th>
         <th class="coll-col" title="Collection this mod was installed as part of">From collection</th>
         <th class="endo-col" title="Whether you've endorsed this mod on Nexus">Endorsed</th>
         <th>Status</th>
@@ -1155,6 +1163,7 @@
   const searchField = document.getElementById('searchField');
   const sizeTotal = document.getElementById('sizeTotal');
   const sortOrderOption = document.getElementById('sortOrderOption');
+  const sortInstalledOption = document.getElementById('sortInstalledOption');
   const notEndorsed = document.getElementById('notEndorsed');
   const notEndorsedField = document.getElementById('notEndorsedField');
   const missingNote = document.getElementById('missingNote');
@@ -1530,6 +1539,7 @@
     const modState = profile ? (profile.modState || {}) : null;
 
     const membership = collectionMembership(gameMods);
+    const pageCounts = nexusPageCounts(gameMods);
 
     let rows = Object.entries(gameMods).map(([modId, mod]) => {
       const attr = mod.attributes || {};
@@ -1568,6 +1578,8 @@
         modId, name, version, enabled, sourceUrl, source, size,
         collections, collectionText: collectionLabel(collections),
         endorsed: attr.endorsed,
+        installed: installedAt(attr.installTime),
+        pageSiblings: pageCounts.get(modId) || 0,
       };
     });
 
@@ -1623,6 +1635,8 @@
     table.classList.toggle('no-size', !view.hasSize);
     table.classList.toggle('no-coll', !view.hasColl);
     table.classList.toggle('no-endo', !view.hasEndo);
+    table.classList.toggle('no-when', !view.hasWhen);
+    sortInstalledOption.hidden = !view.hasWhen;
     notEndorsedField.style.display = view.hasEndo ? '' : 'none';
     // Only worth offering when there's more than one game to combine.
     showBulkExport(gamesWithMods(parsed).length > 1);
@@ -1651,6 +1665,7 @@
 
       cell(tr, 'ver', r.version);
       cell(tr, 'size', formatSize(r.size));
+      cell(tr, 'when', installedLabel(r.installed));
 
       const collTd = cell(tr, 'coll');
       if (r.collections && r.collections.length){
@@ -1690,6 +1705,14 @@
         srcTd.appendChild(a);
       } else {
         srcTd.textContent = r.source;
+      }
+      // One Nexus page can ship several files, each installing as its own mod.
+      // Saying so turns a link that looks repeated into one that is explained.
+      if (r.pageSiblings > 1){
+        const note = document.createElement('span');
+        note.className = 'siblings';
+        note.textContent = '  · ' + r.pageSiblings + ' from this page';
+        srcTd.appendChild(note);
       }
 
       tbody.appendChild(tr);
@@ -2201,20 +2224,30 @@
 
     // Only MO2 files carry a verified order; only Vortex files carry sizes
     // and collections. Each column hides where the data doesn't exist.
-    const { order: hasOrder, size: hasSize, coll: hasColl, endo: hasEndo } = columnsIn(unfiltered);
+    const { order: hasOrder, size: hasSize, coll: hasColl, endo: hasEndo,
+            when: hasWhen } = columnsIn(unfiltered);
 
     // Falling back rather than sorting by a field that isn't there.
     let sort = options.sort || 'name';
     if (sort === 'order' && !hasOrder) sort = 'name';
+    if (sort === 'installed' && !hasWhen) sort = 'name';
     if (sort === 'order'){
       rows = rows.slice().sort((a,b) => a.order - b.order);
     } else if (sort === 'size'){
       rows = rows.slice().sort((a,b) => (b.size || 0) - (a.size || 0));
+    } else if (sort === 'installed'){
+      // Newest first, and anything with no date sorts to the end rather than
+      // to 1970.
+      rows = rows.slice().sort((a,b) => {
+        const x = typeof a.installed === 'number' ? a.installed : -Infinity;
+        const y = typeof b.installed === 'number' ? b.installed : -Infinity;
+        return y - x;
+      });
     }
 
     const totalBytes = rows.reduce((sum, r) => sum + (typeof r.size === 'number' ? r.size : 0), 0);
     return {
-      rows, sort, hasOrder, hasSize, hasColl, hasEndo, totalBytes,
+      rows, sort, hasOrder, hasSize, hasColl, hasEndo, hasWhen, totalBytes,
       sizeTotalText: totalBytes > 0 ? '  ·  ' + formatSize(totalBytes) + ' on disk' : '',
       emptyNote: search.trim() ? 'No mods match that search.' : 'No mods match the current filter.',
     };
@@ -2289,6 +2322,46 @@
                  : 'vortex-modlist-selected-games.csv';
   }
 
+  // Vortex writes installTime as an ISO string. Parsed to a number on the row
+  // so sorting is arithmetic: comparing the strings would put "2024-1-5"
+  // after "2024-10-5".
+  function installedAt(value){
+    if (typeof value !== 'string' || !value) return null;
+    const t = Date.parse(value);
+    return isFinite(t) ? t : null;
+  }
+
+  // Date only. The second something was installed is never the question, and
+  // showing it would make the column three times wider for nothing.
+  function installedLabel(ms){
+    if (typeof ms !== 'number' || !isFinite(ms)) return '—';
+    const d = new Date(ms);
+    const pad = n => (n < 10 ? '0' : '') + n;
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  // One Nexus page often ships several files -- a main download plus optional
+  // patches -- and each installs as its own mod. That is normal, so this
+  // counts rather than flags: a mod sharing its page says so, and a mod that
+  // is the only install from its page says nothing.
+  function nexusPageCounts(gameMods){
+    const perPage = new Map();
+    const pageOf = modId => {
+      const a = (gameMods[modId] || {}).attributes || {};
+      return (a.source === 'nexus' && a.modId) ? String(a.modId) : null;
+    };
+    Object.keys(gameMods).forEach(modId => {
+      const key = pageOf(modId);
+      if (key) perPage.set(key, (perPage.get(key) || 0) + 1);
+    });
+    const counts = new Map();
+    Object.keys(gameMods).forEach(modId => {
+      const key = pageOf(modId);
+      if (key) counts.set(modId, perPage.get(key) || 1);
+    });
+    return counts;
+  }
+
   function statusLabel(enabled){
     return enabled === null || enabled === undefined ? '—' : (enabled ? 'enabled' : 'disabled');
   }
@@ -2304,6 +2377,7 @@
       size: list.some(r => typeof r.size === 'number'),
       coll: list.some(r => r.collectionText),
       endo: list.some(r => r.endorsed !== undefined && r.endorsed !== null),
+      when: list.some(r => typeof r.installed === 'number'),
     };
   }
 
@@ -2390,18 +2464,23 @@
       downloadCsv(exportName('.csv'), lines);
       return;
     }
-    const { order: withOrder, size: withSize, coll: withColl, endo: withEndo } = columnsIn(currentRows);
+    const { order: withOrder, size: withSize, coll: withColl, endo: withEndo,
+            when: withWhen } = columnsIn(currentRows);
     const header = (withOrder ? ['#'] : [])
       .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [],
+        withWhen ? ['Installed'] : [],
         withColl ? ['From collection'] : [], withEndo ? ['Endorsed'] : [],
+        ['From same Nexus page'],
         ['Status','Source','Source URL']);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
       const fields = (withOrder ? [typeof r.order === 'number' ? r.order : ''] : [])
         .concat([r.name, r.version],
           withSize ? [formatSize(r.size), typeof r.size === 'number' ? r.size : ''] : [],
+          withWhen ? [installedLabel(r.installed)] : [],
           withColl ? [r.collectionText || ''] : [],
           withEndo ? [endorsementLabel(r.endorsed)] : [],
+          [r.pageSiblings > 1 ? r.pageSiblings : ''],
           [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
@@ -2433,12 +2512,13 @@
     });
     // Fixed columns regardless of what each game happens to carry, so the
     // sheet stays rectangular and sortable.
-    const lines = [['Game','Name','Version','Size','Size (bytes)','From collection',
+    const lines = [['Game','Name','Version','Size','Size (bytes)','Installed','From collection',
       'Endorsed','Status','Source','Source URL'].join(',')];
     rows.forEach(r => {
       lines.push([
         r.game, r.name, r.version,
         formatSize(r.size), typeof r.size === 'number' ? r.size : '',
+        installedLabel(r.installed),
         r.collectionText || '', endorsementLabel(r.endorsed),
         csvStatus(r.enabled),
         r.source, r.sourceUrl || '',

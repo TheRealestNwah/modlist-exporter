@@ -32,7 +32,12 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
 - **Endorsement status** — see at a glance which mods you've endorsed on
   Nexus, with a filter for the ones you haven't got round to
 - **Search and sort** — filter the list by name, mod ID, version or source;
-  sort by name, install size, or MO2 priority order
+  sort by name, install size, install date, or MO2 priority order
+- **Install date** — when Vortex installed each mod, with a "recently
+  installed" sort, so "what did I add last week" doesn't need two snapshots
+- **Same Nexus page** — one mod page often ships a main file plus optional
+  patches, each installing as its own mod. Mods sharing a page say so, rather
+  than looking like the same link repeated
 - **Install size** — per-mod size and a total for whatever is currently shown,
   so you can see what's actually using the disk (Vortex only; MO2's
   `modlist.txt` records no sizes)
@@ -102,8 +107,9 @@ functions it lifts:
 `allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
-`bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `themeIds`,
-`resolveTheme` and `themeMeta`.
+`bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `installedAt`,
+`installedLabel`, `nexusPageCounts`, `themeIds`, `resolveTheme` and
+`themeMeta`.
 
 That list is maintained by hand, and forgetting to add a newly extracted
 helper to it broke the suite three separate times — each time as a wall of
@@ -368,6 +374,21 @@ activated one; a game with no profile at all falls back to its full installed
 list, where status reads as unknown. The search, enabled-only and
 not-yet-endorsed filters all apply per game, so the export matches what you'd
 see stepping through each game in turn.
+
+## Install date and same-page mods
+
+Vortex records an `installTime` per mod, on 434 of the 436 in the library this
+was built against. The **Installed** column shows the date and the
+**Recently installed** sort orders by it, newest first, with anything undated
+falling to the end rather than to 1970.
+
+A separate thing the source column now says: one Nexus mod page frequently
+ships several files — a main download plus optional patches — and Vortex
+installs each as its own mod. 81 of those 436 share a page with something
+else. That's normal, so they're counted rather than flagged: a mod sharing
+its page notes how many came from it, and a mod that's the only install from
+its page says nothing. Without it the same Nexus link appears several times
+in a list with no indication why.
 
 ## Endorsement
 
