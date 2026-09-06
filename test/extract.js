@@ -18,6 +18,8 @@ const NAMES = [
   'parseMO2',
   'parseModlist',
   'statusLabel',
+  'columnsIn',
+  'csvStatus',
   'diffRows',
   'buildRows',
   'csvCell',

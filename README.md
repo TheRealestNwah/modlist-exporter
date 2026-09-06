@@ -97,7 +97,8 @@ functions it lifts:
 `parseMO2`, `parseModlist`, `buildRows`, `viewState`, `diffRows`,
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
-`isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
+`isUnendorsed`, `columnsIn`, `csvStatus`, `defaultProfileFor`,
+`gamesWithMods`, `allGamesRows`,
 `allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
@@ -129,6 +130,13 @@ stale state; a note firing for a format it didn't apply to), and neither
 needed a browser to catch. Keeping the decisions DOM-free is what makes them
 testable without adding a dependency or a build step to a single-file
 project.
+
+`columnsIn()` is the same idea applied across the outputs. Which optional
+columns a row set carries — order, size, collection, endorsement — is a
+decision the table, the CSV, the Markdown table and the BBCode list all have
+to reach the same answer on. They each used to ask in their own words, which
+is how a column ends up in an export that wasn't in the view it came from, so
+they now share one answer and one test.
 
 That leaves the wiring untested — whether a listener is attached, whether an
 element ID is right. Those fail loudly on first load rather than silently

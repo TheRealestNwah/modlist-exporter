@@ -1179,27 +1179,30 @@
   // and the one thing that loads a file could not. A div with role=button
   // gets no key handling from the browser, so Enter and Space are wired up
   // here the way a real button would have given them for free.
-  function activateOnKey(zone, input){
+  // Both drop zones -- the primary one and the compare one -- behave the
+  // same: click or Enter/Space opens the picker, a drag highlights, a drop
+  // hands the first file over. They differ only in which handler receives it.
+  function wireDropZone(zone, input, onFile){
+    zone.addEventListener('click', () => input.click());
     zone.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' '){
         e.preventDefault(); // Space would otherwise scroll the page
         input.click();
       }
     });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag');
+      if (e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', e => {
+      if (e.target.files.length) onFile(e.target.files[0]);
+    });
   }
 
-  dropzone.addEventListener('click', () => fileInput.click());
-  activateOnKey(dropzone, fileInput);
-  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
-  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-  dropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropzone.classList.remove('drag');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener('change', e => {
-    if (e.target.files.length) handleFile(e.target.files[0]);
-  });
+  wireDropZone(dropzone, fileInput, handleFile);
 
   // The themes the picker offers, in the order it offers them. Inlined in a
   // function rather than held in a shared const so the test harness, which
@@ -1568,6 +1571,28 @@
     return rows;
   }
 
+  // Every cell in both tables is "make a td, maybe class it, maybe put text
+  // in it, hang it off the row". Text goes in as a text node, never as HTML:
+  // mod names come from mod authors, so nothing here is trusted markup.
+  function cell(tr, className, text){
+    const td = document.createElement('td');
+    if (className) td.className = className;
+    if (text !== undefined) td.textContent = text;
+    tr.appendChild(td);
+    return td;
+  }
+
+  // A badge is a classed span with its own text -- the enabled/disabled pill
+  // in the mod list and the added/removed/changed pill in the changes view
+  // are the same object with different words in it.
+  function badgeIn(parent, kind, text){
+    const span = document.createElement('span');
+    span.className = 'badge ' + kind;
+    span.textContent = text;
+    parent.appendChild(span);
+    return span;
+  }
+
   function render(){
     if (!parsed) return;
 
@@ -1595,12 +1620,9 @@
     rows.forEach(r => {
       const tr = document.createElement('tr');
 
-      const ordTd = document.createElement('td');
-      ordTd.className = 'ord';
-      ordTd.textContent = typeof r.order === 'number' ? r.order : '';
-      tr.appendChild(ordTd);
+      cell(tr, 'ord', typeof r.order === 'number' ? r.order : '');
 
-      const nameTd = document.createElement('td');
+      const nameTd = cell(tr, null);
       const nameDiv = document.createElement('div');
       nameDiv.className = 'mod-name';
       nameDiv.textContent = r.name;
@@ -1611,20 +1633,11 @@
         idDiv.textContent = r.modId;
         nameTd.appendChild(idDiv);
       }
-      tr.appendChild(nameTd);
 
-      const verTd = document.createElement('td');
-      verTd.className = 'ver';
-      verTd.textContent = r.version;
-      tr.appendChild(verTd);
+      cell(tr, 'ver', r.version);
+      cell(tr, 'size', formatSize(r.size));
 
-      const sizeTd = document.createElement('td');
-      sizeTd.className = 'size';
-      sizeTd.textContent = formatSize(r.size);
-      tr.appendChild(sizeTd);
-
-      const collTd = document.createElement('td');
-      collTd.className = 'coll';
+      const collTd = cell(tr, 'coll');
       if (r.collections && r.collections.length){
         r.collections.forEach((entry, i) => {
           if (i) collTd.appendChild(document.createTextNode(', '));
@@ -1639,23 +1652,20 @@
       } else {
         collTd.textContent = '—';
       }
-      tr.appendChild(collTd);
 
-      const endoTd = document.createElement('td');
-      endoTd.className = 'endo';
-      endoTd.textContent = endorsementLabel(r.endorsed);
-      tr.appendChild(endoTd);
+      cell(tr, 'endo', endorsementLabel(r.endorsed));
 
-      const statTd = document.createElement('td');
+      const statTd = cell(tr, null);
       if (r.enabled === null){
-        statTd.innerHTML = '<span class="ver">—</span>';
+        const dash = document.createElement('span');
+        dash.className = 'ver';
+        dash.textContent = statusLabel(null);
+        statTd.appendChild(dash);
       } else {
-        statTd.innerHTML = '<span class="badge ' + (r.enabled ? 'on':'off') + '">' + (r.enabled ? 'enabled':'disabled') + '</span>';
+        badgeIn(statTd, r.enabled ? 'on' : 'off', statusLabel(r.enabled));
       }
-      tr.appendChild(statTd);
 
-      const srcTd = document.createElement('td');
-      srcTd.className = 'src';
+      const srcTd = cell(tr, 'src');
       if (r.sourceUrl){
         const a = document.createElement('a');
         a.href = r.sourceUrl;
@@ -1666,7 +1676,6 @@
       } else {
         srcTd.textContent = r.source;
       }
-      tr.appendChild(srcTd);
 
       tbody.appendChild(tr);
     });
@@ -1765,22 +1774,14 @@
     shown.forEach(d => {
       const tr = document.createElement('tr');
 
-      const chgTd = document.createElement('td');
-      const badge = document.createElement('span');
-      badge.className = 'badge ' + d.change;
-      badge.textContent = d.change;
-      chgTd.appendChild(badge);
-      tr.appendChild(chgTd);
+      badgeIn(cell(tr, null), d.change, d.change);
 
-      const nameTd = document.createElement('td');
       const nameDiv = document.createElement('div');
       nameDiv.className = 'mod-name';
       nameDiv.textContent = d.row.name;
-      nameTd.appendChild(nameDiv);
-      tr.appendChild(nameTd);
+      cell(tr, null).appendChild(nameDiv);
 
-      const detTd = document.createElement('td');
-      detTd.className = 'chg';
+      const detTd = cell(tr, 'chg');
       if (d.change === 'changed'){
         d.changes.forEach((c, i) => {
           if (i) detTd.appendChild(document.createTextNode('  ·  '));
@@ -1801,7 +1802,6 @@
         bits.push(statusLabel(d.row.enabled));
         detTd.textContent = bits.join('  ·  ');
       }
-      tr.appendChild(detTd);
 
       diffTableBody.appendChild(tr);
     });
@@ -1880,18 +1880,7 @@
   viewListBtn.addEventListener('click', () => setView('list'));
   viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
 
-  compareZone.addEventListener('click', () => compareInput.click());
-  activateOnKey(compareZone, compareInput);
-  compareZone.addEventListener('dragover', e => { e.preventDefault(); compareZone.classList.add('drag'); });
-  compareZone.addEventListener('dragleave', () => compareZone.classList.remove('drag'));
-  compareZone.addEventListener('drop', e => {
-    e.preventDefault();
-    compareZone.classList.remove('drag');
-    if (e.dataTransfer.files.length) handleCompareFile(e.dataTransfer.files[0]);
-  });
-  compareInput.addEventListener('change', e => {
-    if (e.target.files.length) handleCompareFile(e.target.files[0]);
-  });
+  wireDropZone(compareZone, compareInput, handleCompareFile);
 
   function exportBaseName(){
     return (parsed && parsed.type === 'mo2') ? 'mo2-modlist' : 'vortex-modlist';
@@ -1972,10 +1961,7 @@
   function markdownLines(rows){
     const list = rows || [];
     if (!list.length) return [];
-    const withOrder = list.some(r => typeof r.order === 'number');
-    const withSize = list.some(r => typeof r.size === 'number');
-    const withColl = list.some(r => r.collectionText);
-    const withEndo = list.some(r => r.endorsed !== undefined && r.endorsed !== null);
+    const { order: withOrder, size: withSize, coll: withColl, endo: withEndo } = columnsIn(list);
 
     const cols = (withOrder ? [['#', '--:']] : [])
       .concat([['Mod', '---'], ['Version', '---']],
@@ -2009,7 +1995,7 @@
   function bbcodeLines(rows){
     const list = rows || [];
     if (!list.length) return [];
-    const withOrder = list.some(r => typeof r.order === 'number');
+    const withOrder = columnsIn(list).order;
     const out = ['[list]'];
     list.forEach(r => {
       const prefix = withOrder && typeof r.order === 'number' ? r.order + '. ' : '';
@@ -2191,10 +2177,7 @@
 
     // Only MO2 files carry a verified order; only Vortex files carry sizes
     // and collections. Each column hides where the data doesn't exist.
-    const hasOrder = unfiltered.some(r => typeof r.order === 'number');
-    const hasSize = unfiltered.some(r => typeof r.size === 'number');
-    const hasColl = unfiltered.some(r => r.collectionText);
-    const hasEndo = unfiltered.some(r => r.endorsed !== undefined && r.endorsed !== null);
+    const { order: hasOrder, size: hasSize, coll: hasColl, endo: hasEndo } = columnsIn(unfiltered);
 
     // Falling back rather than sorting by a field that isn't there.
     let sort = options.sort || 'name';
@@ -2286,6 +2269,26 @@
     return enabled === null || enabled === undefined ? '—' : (enabled ? 'enabled' : 'disabled');
   }
 
+  // The one place that decides which optional columns a row set carries. The
+  // table, the CSV, the Markdown table and the BBCode list all have to agree
+  // about this, and they used to each ask in their own words -- so a column
+  // could appear in an export and not the view it was exported from.
+  function columnsIn(rows){
+    const list = rows || [];
+    return {
+      order: list.some(r => typeof r.order === 'number'),
+      size: list.some(r => typeof r.size === 'number'),
+      coll: list.some(r => r.collectionText),
+      endo: list.some(r => r.endorsed !== undefined && r.endorsed !== null),
+    };
+  }
+
+  // Status as a CSV cell: an unknown state is left empty rather than written
+  // as the em dash the table shows, since a spreadsheet should see a blank.
+  function csvStatus(enabled){
+    return enabled === null || enabled === undefined ? '' : (enabled ? 'enabled' : 'disabled');
+  }
+
   // Compares two row sets keyed by modId (which is the mod name for MO2).
   // Direction is oldest -> newest by file timestamp, so 'added' means the mod
   // is present in the newer file only.
@@ -2327,7 +2330,7 @@
 
   // currentRows is whatever the table is showing, so exports match the view.
   function exportHasOrder(){
-    return currentRows.some(r => typeof r.order === 'number');
+    return columnsIn(currentRows).order;
   }
 
   // Plain-text rendering of what changed. Empty for added/removed rows,
@@ -2363,23 +2366,19 @@
       download(exportBaseName() + '-changes.csv', lines.join('\n'), 'text/csv');
       return;
     }
-    const withOrder = exportHasOrder();
-    const withSize = currentRows.some(r => typeof r.size === 'number');
-    const withColl = currentRows.some(r => r.collectionText);
-    const withEndo = currentRows.some(r => r.endorsed !== undefined && r.endorsed !== null);
+    const { order: withOrder, size: withSize, coll: withColl, endo: withEndo } = columnsIn(currentRows);
     const header = (withOrder ? ['#'] : [])
       .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [],
         withColl ? ['From collection'] : [], withEndo ? ['Endorsed'] : [],
         ['Status','Source','Source URL']);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
-      const status = r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled');
       const fields = (withOrder ? [typeof r.order === 'number' ? r.order : ''] : [])
         .concat([r.name, r.version],
           withSize ? [formatSize(r.size), typeof r.size === 'number' ? r.size : ''] : [],
           withColl ? [r.collectionText || ''] : [],
           withEndo ? [endorsementLabel(r.endorsed)] : [],
-          [status, r.source, r.sourceUrl || '']);
+          [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
     download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
@@ -2417,7 +2416,7 @@
         r.game, r.name, r.version,
         formatSize(r.size), typeof r.size === 'number' ? r.size : '',
         r.collectionText || '', endorsementLabel(r.endorsed),
-        r.enabled === null ? '' : (r.enabled ? 'enabled' : 'disabled'),
+        csvStatus(r.enabled),
         r.source, r.sourceUrl || '',
       ].map(csvCell).join(','));
     });
