@@ -60,6 +60,7 @@ const NAMES = [
   'installedLabel',
   'nexusPageCounts',
   'themeIds',
+  'legacyThemeId',
   'resolveTheme',
   'themeMeta',
 ];

@@ -52,8 +52,8 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   view exports too, as `*-changes.csv` / `*-changes.txt`)
 - **Markdown and BBCode** — a format picker next to the export buttons, for
   posting a load order on a forum, a wiki, or in a repo
-- **Seven themes** — Midnight, Vortex, NMM, Liquid Glass, UESP, and a
-  Fallout 3 / New Vegas terminal pair, picked in the header and remembered
+- **Eight themes** — Midnight, Vortex, NMM, Liquid Glass, UESP, Terminal
+  Green, Terminal Amber and Cyberpunk, picked in the header and remembered
   per browser
 - **Bulk CSV** — several Vortex games in one sheet with a `Game` column, for
   when you want the whole setup rather than one game at a time; tick the games
@@ -120,7 +120,7 @@ functions it lifts:
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `installedAt`,
 `installedLabel`, `nexusPageCounts`, `loadOrderFor`, `gamesWithLoadOrder`,
-`loadOrderNote`, `themeIds`, `resolveTheme` and `themeMeta`.
+`loadOrderNote`, `themeIds`, `legacyThemeId`, `resolveTheme` and `themeMeta`.
 
 That list is maintained by hand, and forgetting to add a newly extracted
 helper to it broke the suite three separate times — each time as a wall of

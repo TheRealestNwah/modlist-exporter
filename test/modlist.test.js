@@ -14,7 +14,7 @@ const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matche
         columnsIn, csvStatus, statusLabel,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
-        themeIds, resolveTheme, themeMeta } = require('./extract.js');
+        themeIds, resolveTheme, themeMeta, legacyThemeId } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -1176,7 +1176,8 @@ test('diff exports escape a hostile name in both formats', () => {
 // --------------------------------------------------------------- theming
 
 test('themeIds: the picker offers exactly the themes that have a block', () => {
-  assert.deepStrictEqual(themeIds(), ['midnight', 'vortex', 'nmm', 'glass', 'uesp', 'fo3', 'nv']);
+  assert.deepStrictEqual(themeIds(),
+    ['midnight', 'vortex', 'nmm', 'glass', 'uesp', 'green', 'amber', 'cyberpunk']);
 });
 
 test('resolveTheme: a known id passes through', () => {
@@ -1190,6 +1191,22 @@ test('resolveTheme: anything unrecognised falls back to the default', () => {
   // former id, from before it was renamed to 'vortex'.
   ['', 'sepia', 'nexus', 'MIDNIGHT', ' glass', null, undefined, 0, {}].forEach((bad) => {
     assert.strictEqual(resolveTheme(bad), 'midnight', JSON.stringify(bad) + ' should fall back');
+  });
+});
+
+test('resolveTheme: the renamed terminal themes keep working from storage', () => {
+  // These two were named after the games they resemble before being renamed
+  // for the colour they actually are. Anyone who had one selected has the old
+  // id in their browser, and should not be silently reset to the default.
+  assert.strictEqual(resolveTheme('fo3'), 'green');
+  assert.strictEqual(resolveTheme('nv'), 'amber');
+});
+
+test('legacyThemeId: maps only the two ids that were renamed', () => {
+  assert.strictEqual(legacyThemeId('fo3'), 'green');
+  assert.strictEqual(legacyThemeId('nv'), 'amber');
+  ['midnight', 'green', 'amber', 'cyberpunk', 'nexus', '', null].forEach((v) => {
+    assert.strictEqual(legacyThemeId(v), null, String(v) + ' is not a rename');
   });
 });
 
@@ -1210,7 +1227,7 @@ test('themeMeta: color-scheme matches whether each theme is actually light or da
   assert.deepStrictEqual(
     Object.fromEntries(themeIds().map((id) => [id, themeMeta(id).colorScheme])),
     { midnight: 'dark', vortex: 'dark', nmm: 'light', glass: 'light',
-      uesp: 'light', fo3: 'dark', nv: 'dark' }
+      uesp: 'light', green: 'dark', amber: 'dark', cyberpunk: 'dark' }
   );
 });
 
