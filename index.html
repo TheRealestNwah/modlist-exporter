@@ -625,6 +625,200 @@
     [data-theme="glass"] body{ background: var(--bg); }
   }
 
+  /* --- UESP ----------------------------------------------------------
+     A MediaWiki skin, not an app: off-white page, boxed tables with the
+     exact grey MediaWiki's own `wikitable` class uses, and the classic
+     wiki-blue links that predate Wikipedia's current palette. Near-square
+     corners, because a wiki page has never had a rounded one. */
+  [data-theme="uesp"]{
+    color-scheme: light;
+    --bg: #f8f9fa;
+    --panel: #ffffff;
+    --panel-2: #eaecf0;
+    --line: #a2a9b1;
+    --ink: #202122;
+    --ink-dim: #54595d;
+    --accent: #002bb8;
+    --accent-dim: #002bb8;
+    --good: #14866d;
+    --bad: #d73333;
+    --good-tint: rgba(20,134,109,0.12);
+    --good-edge: rgba(20,134,109,0.35);
+    --bad-tint: rgba(215,51,51,0.10);
+    --bad-edge: rgba(215,51,51,0.32);
+    --accent-tint: rgba(0,43,184,0.10);
+    --accent-ink: #002bb8;
+    --on-accent: #ffffff;
+    --on-good: #ffffff;
+    --thead-bg: #eaecf0;
+    --r-control: 2px;
+    --r-btn: 2px;
+    --r-badge: 2px;
+    --r-panel: 2px;
+    --r-drop: 2px;
+    --sans: Arial, Helvetica, 'Helvetica Neue', sans-serif;
+    --mono: Consolas, 'Courier New', Courier, monospace;
+  }
+  /* Every real wiki link is underlined and plain-filled, not a button --
+     the closest a MediaWiki skin has to a "button" is a bordered tab like
+     Edit or View history, which is what these borrow their look from. */
+  [data-theme="uesp"] .export-btns button{
+    background: var(--panel);
+    color: var(--accent);
+    border: 1px solid var(--line);
+    font-weight: 400;
+  }
+  [data-theme="uesp"] .export-btns button:hover{
+    background: #eaf3ff;
+    border-color: var(--accent);
+  }
+  [data-theme="uesp"] .export-btns button.copied{
+    background: #eefdf9;
+    color: var(--good);
+    border-color: var(--good);
+  }
+  [data-theme="uesp"] .view-tabs button.active{
+    background: #eaf3ff;
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  /* Real wiki links are underlined without needing a hover to reveal it --
+     the one thing every other theme here deliberately doesn't do. Scoped to
+     the link itself, not the dropzone or the disclosure summary: those are
+     controls, not hyperlinks, and text-decoration set on a block paints
+     through its own descendants regardless of what they declare, so the
+     mistake to avoid is putting it anywhere but the actual <a>. */
+  [data-theme="uesp"] .src a{ text-decoration: underline; }
+  /* The exact border and header fill MediaWiki's own `wikitable` class
+     uses, cell-boxed rather than row-divided -- what turns a list into a
+     reference table. */
+  [data-theme="uesp"] thead th{ border: 1px solid var(--line); }
+  [data-theme="uesp"] tbody td{ border: 1px solid var(--line); }
+  [data-theme="uesp"] tbody tr:hover{ background: #eaf3ff; }
+
+  /* --- Fallout 3 terminal / New Vegas terminal ---------------------------
+     A monochrome CRT readout, not a web page: everything in one phosphor
+     colour, square corners, brackets around anything clickable the way a
+     terminal menu option reads as "[ CONTINUE ]", and a scanline overlay
+     over the whole screen. FO3's phosphor is green; New Vegas gets the
+     other classic CRT colour, amber, so the two are a genuine alternate
+     pair rather than the same theme renamed twice. Both keep red for an
+     alert state -- a monochrome screen can still flag "DISABLED" in a
+     second colour, the way a terminal's own warning text would. */
+  [data-theme="fo3"], [data-theme="nv"]{
+    color-scheme: dark;
+    --sans: ui-monospace, 'Courier New', Courier, monospace;
+    --mono: ui-monospace, 'Courier New', Courier, monospace;
+    --on-accent: var(--bg);
+    --on-good: var(--bg);
+    --r-control: 0;
+    --r-btn: 0;
+    --r-badge: 0;
+    --r-panel: 0;
+    --r-drop: 0;
+    /* currentColor means each element glows in its own ink -- green text
+       gets a green halo, the red disabled badge gets a red one -- rather
+       than every element inheriting one fixed colour of glow regardless
+       of what it says. */
+    text-shadow: 0 0 4px currentColor;
+  }
+  [data-theme="fo3"]{
+    --bg: #030d03;
+    --panel: #05170a;
+    --panel-2: #072208;
+    --line: #1d5c1d;
+    --ink: #33ff33;
+    --ink-dim: #1f8f1f;
+    --accent: #33ff33;
+    --accent-dim: #33ff33;
+    --good: #33ff33;
+    --bad: #ff3b3b;
+    --good-tint: rgba(51,255,51,0.12);
+    --good-edge: rgba(51,255,51,0.35);
+    --bad-tint: rgba(255,59,59,0.14);
+    --bad-edge: rgba(255,59,59,0.40);
+    --accent-tint: rgba(51,255,51,0.14);
+    --accent-ink: #ffdd55;
+    --thead-bg: #05170a;
+  }
+  [data-theme="nv"]{
+    --bg: #0d0700;
+    --panel: #1a0d00;
+    --panel-2: #241300;
+    --line: #7a4a10;
+    --ink: #ffb000;
+    --ink-dim: #b37b1f;
+    --accent: #ffb000;
+    --accent-dim: #ffb000;
+    --good: #ffb000;
+    --bad: #ff4d2e;
+    --good-tint: rgba(255,176,0,0.12);
+    --good-edge: rgba(255,176,0,0.35);
+    --bad-tint: rgba(255,77,46,0.16);
+    --bad-edge: rgba(255,77,46,0.40);
+    --accent-tint: rgba(255,176,0,0.14);
+    --accent-ink: #ff8800;
+    --thead-bg: #1a0d00;
+  }
+  /* A terminal menu option is a bracketed word, not a filled rectangle --
+     the base button fill is overridden to transparent so the bracket and
+     the outline carry it instead. Hovering or being the active tab still
+     inverts to a solid phosphor fill via the existing --accent-dim /
+     --on-accent tokens, which is exactly what selecting a highlighted
+     terminal menu item looks like. */
+  [data-theme="fo3"] .export-btns button,
+  [data-theme="nv"] .export-btns button{
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-weight: 400;
+  }
+  [data-theme="fo3"] .export-btns button:hover,
+  [data-theme="nv"] .export-btns button:hover{
+    background: var(--accent);
+    color: var(--on-accent);
+    text-shadow: none;
+  }
+  [data-theme="fo3"] .export-btns button::before,
+  [data-theme="fo3"] .view-tabs button::before,
+  [data-theme="nv"] .export-btns button::before,
+  [data-theme="nv"] .view-tabs button::before{ content: '[ '; }
+  [data-theme="fo3"] .export-btns button::after,
+  [data-theme="fo3"] .view-tabs button::after,
+  [data-theme="nv"] .export-btns button::after,
+  [data-theme="nv"] .view-tabs button::after{ content: ' ]'; }
+  /* Chrome reads as terminal labels in caps; the mod list itself -- names,
+     versions, search text -- stays as typed, since a long list set entirely
+     in capitals is real data made harder to scan, not more authentic. */
+  [data-theme="fo3"] h1, [data-theme="nv"] h1,
+  [data-theme="fo3"] .eyebrow, [data-theme="nv"] .eyebrow,
+  [data-theme="fo3"] thead th, [data-theme="nv"] thead th,
+  [data-theme="fo3"] .export-btns button, [data-theme="nv"] .export-btns button,
+  [data-theme="fo3"] .view-tabs button, [data-theme="nv"] .view-tabs button,
+  [data-theme="fo3"] .badge, [data-theme="nv"] .badge,
+  [data-theme="fo3"] .toggle-btn, [data-theme="nv"] .toggle-btn,
+  [data-theme="fo3"] .field label, [data-theme="nv"] .field label{
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  [data-theme="fo3"] tbody tr:hover, [data-theme="nv"] tbody tr:hover{
+    background: var(--panel-2);
+  }
+  /* The scanline-and-vignette overlay is a fixed pseudo-element on <html>
+     itself, above every real element including the sticky table header --
+     a CRT's glass covers the whole tube, not just part of it. It carries
+     no pointer-events, so nothing under it stops working. */
+  [data-theme="fo3"]::before, [data-theme="nv"]::before{
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.16) 3px),
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.35) 100%);
+  }
+
   /* The picker itself, sitting opposite the eyebrow. */
   .header-top{
     display: flex;
@@ -703,6 +897,9 @@
           <option value="vortex">Vortex</option>
           <option value="nmm">NMM</option>
           <option value="glass">Liquid Glass</option>
+          <option value="uesp">UESP</option>
+          <option value="fo3">Fallout 3 terminal</option>
+          <option value="nv">New Vegas terminal</option>
         </select>
       </div>
     </div>
@@ -936,7 +1133,7 @@
   // function rather than held in a shared const so the test harness, which
   // lifts these out one at a time, does not need the surrounding scope.
   function themeIds(){
-    return ['midnight', 'vortex', 'nmm', 'glass'];
+    return ['midnight', 'vortex', 'nmm', 'glass', 'uesp', 'fo3', 'nv'];
   }
 
   // Anything unrecognised falls back to the default rather than leaving the
@@ -955,6 +1152,9 @@
     if (id === 'vortex') return { colorScheme: 'dark', themeColor: '#101114' };
     if (id === 'nmm') return { colorScheme: 'light', themeColor: '#f0f0f0' };
     if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
+    if (id === 'uesp') return { colorScheme: 'light', themeColor: '#f8f9fa' };
+    if (id === 'fo3') return { colorScheme: 'dark', themeColor: '#030d03' };
+    if (id === 'nv') return { colorScheme: 'dark', themeColor: '#0d0700' };
     return { colorScheme: 'dark', themeColor: '#16141c' };
   }
 
