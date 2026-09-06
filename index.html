@@ -770,15 +770,6 @@
   [data-theme="uesp"] tbody td{ border: 1px solid var(--line); }
   [data-theme="uesp"] tbody tr:hover{ background: var(--panel-2); }
 
-  /* --- Fallout 3 terminal / New Vegas terminal ---------------------------
-     A monochrome CRT readout, not a web page: everything in one phosphor
-     colour, square corners, brackets around anything clickable the way a
-     terminal menu option reads as "[ CONTINUE ]", and a scanline overlay
-     over the whole screen. FO3's phosphor is green; New Vegas gets the
-     other classic CRT colour, amber, so the two are a genuine alternate
-     pair rather than the same theme renamed twice. Both keep red for an
-     alert state -- a monochrome screen can still flag "DISABLED" in a
-     second colour, the way a terminal's own warning text would. */
   /* Acid yellow on near-black with a cyan counterpoint, which is the palette
      Cyberpunk 2077's interface is built from. Square corners and a heavy
      accent, since the look is signage rather than software. */
@@ -824,6 +815,15 @@
     letter-spacing: .07em;
   }
 
+  /* --- Terminal Green / Terminal Amber -----------------------------------
+     A monochrome CRT readout, not a web page: everything in one phosphor
+     colour, square corners, brackets around anything clickable the way a
+     terminal menu option reads as "[ CONTINUE ]", and a scanline overlay
+     over the whole screen. Green and amber are the two classic phosphor
+     colours, so the pair is a genuine alternate rather than the same theme
+     renamed twice. Both keep red for an alert state -- a monochrome screen
+     can still flag "DISABLED" in a second colour, the way a terminal's own
+     warning text would. */
   [data-theme="green"], [data-theme="amber"]{
     color-scheme: dark;
     --sans: ui-monospace, 'Courier New', Courier, monospace;
