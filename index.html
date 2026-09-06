@@ -146,7 +146,8 @@
   .summary-bar.show{ display:flex; }
   .summary-bar .count strong{ color: var(--ink); }
 
-  .export-btns{ display:flex; gap: 8px; }
+  .export-btns{ display:flex; gap: 8px; align-items: center; }
+  .export-btns select{ min-width: unset; padding: 7px 10px; font-size: 12.5px; }
   .export-btns button{
     background: var(--accent-dim);
     color: var(--ink);
@@ -377,6 +378,11 @@
   <div class="summary-bar" id="summaryBar">
     <div class="count"><strong id="modCount">0</strong> <span id="countLabel">mods</span><span class="size-total" id="sizeTotal"></span></div>
     <div class="export-btns">
+      <select id="shareFormat" title="Format for the copy and text download buttons">
+        <option value="text">Plain text</option>
+        <option value="markdown">Markdown</option>
+        <option value="bbcode">BBCode</option>
+      </select>
       <button id="copyBtn">Copy as text</button>
       <button id="csvBtn">Download CSV</button>
       <button id="txtBtn">Download .txt</button>
@@ -444,6 +450,7 @@
   const copyBtn = document.getElementById('copyBtn');
   const csvBtn = document.getElementById('csvBtn');
   const txtBtn = document.getElementById('txtBtn');
+  const shareFormat = document.getElementById('shareFormat');
   const sortSelect = document.getElementById('sortSelect');
   const sortField = document.getElementById('sortField');
   const compareWrap = document.getElementById('compareWrap');
@@ -1101,6 +1108,147 @@
     return '"' + v.replace(/"/g, '""') + '"';
   }
 
+  // Every export format needs its own guard against what mod authors put in a
+  // name. csvCell above stops a spreadsheet executing one; these stop one
+  // breaking out of a table cell or opening a tag.
+  //
+  // Markdown: a bare | ends the cell, and ` * _ [ ] all mean something.
+  // Backslash escapes are the CommonMark spelling and render as the plain
+  // character. Markdown hands raw HTML straight to the renderer, so < becomes
+  // an entity -- but > does not, since nothing can open a tag without a <, and
+  // leaving it be keeps a diff detail like "version 1.0 -> 2.0" readable in
+  // the raw text as well as the rendered table.
+  function mdCell(value){
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/\s*[\r\n]+\s*/g, ' ')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/\\/g, '\\\\')
+      .replace(/([`*_\[\]|])/g, '\\$1');
+  }
+
+  // BBCode has no escape sequence forum software agrees on, so the only
+  // portable way to stop a name like "Skyrim [SE]" opening a tag is to not
+  // emit the brackets. Swapping in parentheses loses a little and stays
+  // readable, which beats a post that renders as broken markup.
+  function bbSafe(value){
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/\s*[\r\n]+\s*/g, ' ')
+      .replace(/\[/g, '(')
+      .replace(/\]/g, ')');
+  }
+
+  // Links here are only ever built from IDs this file already validated, but
+  // an export is the wrong place to lean on that: whitespace, quotes or
+  // brackets in a URL break out of the link syntax in both formats.
+  function safeHttpUrl(url){
+    const u = String(url === null || url === undefined ? '' : url);
+    return /^https:\/\/[^\s()\[\]<>"']+$/.test(u) ? u : null;
+  }
+
+  function mdLink(name, url){
+    const text = mdCell(name);
+    const href = safeHttpUrl(url);
+    return href ? '[' + text + '](' + href + ')' : text;
+  }
+
+  function bbLink(name, url){
+    const text = bbSafe(name);
+    const href = safeHttpUrl(url);
+    return href ? '[url=' + href + ']' + text + '[/url]' : text;
+  }
+
+  // A forum or wiki post wants the narrow table: the mod name carries its own
+  // link, so the Source and Source URL columns the CSV needs would only be
+  // noise. Columns still appear only where the loaded format has the data,
+  // matching what the page itself shows.
+  function markdownLines(rows){
+    const list = rows || [];
+    if (!list.length) return [];
+    const withOrder = list.some(r => typeof r.order === 'number');
+    const withSize = list.some(r => typeof r.size === 'number');
+    const withColl = list.some(r => r.collectionText);
+    const withEndo = list.some(r => r.endorsed !== undefined && r.endorsed !== null);
+
+    const cols = (withOrder ? [['#', '--:']] : [])
+      .concat([['Mod', '---'], ['Version', '---']],
+        withSize ? [['Size', '--:']] : [],
+        withColl ? [['From collection', '---']] : [],
+        withEndo ? [['Endorsed', '---']] : [],
+        [['Status', '---']]);
+
+    const out = [
+      '| ' + cols.map(c => c[0]).join(' | ') + ' |',
+      '| ' + cols.map(c => c[1]).join(' | ') + ' |',
+    ];
+    list.forEach(r => {
+      const cells = (withOrder ? [typeof r.order === 'number' ? String(r.order) : ''] : [])
+        .concat([mdLink(r.name, r.sourceUrl), mdCell(r.version)],
+          withSize ? [mdCell(formatSize(r.size))] : [],
+          withColl ? [mdCell(r.collectionText || '')] : [],
+          withEndo ? [mdCell(endorsementLabel(r.endorsed))] : [],
+          [mdCell(statusLabel(r.enabled))]);
+      out.push('| ' + cells.join(' | ') + ' |');
+    });
+    return out;
+  }
+
+  // Forum BBCode tables are not portable across forum software, so this goes
+  // out as a list. The position is written into the text rather than left to
+  // [list=1] auto-numbering, which would number by whatever the table is
+  // sorted by and quietly misreport the priority order. Status reads
+  // "(disabled)" rather than the .txt export's "[disabled]", which would open
+  // a tag.
+  function bbcodeLines(rows){
+    const list = rows || [];
+    if (!list.length) return [];
+    const withOrder = list.some(r => typeof r.order === 'number');
+    const out = ['[list]'];
+    list.forEach(r => {
+      const prefix = withOrder && typeof r.order === 'number' ? r.order + '. ' : '';
+      const parts = [bbLink(r.name, r.sourceUrl)];
+      if (r.version && r.version !== '—') parts.push(bbSafe(r.version));
+      if (typeof r.size === 'number') parts.push(formatSize(r.size));
+      const status = statusLabel(r.enabled);
+      out.push('[*]' + prefix + parts.join(' — ') +
+        (status === '—' ? '' : ' (' + status + ')'));
+    });
+    out.push('[/list]');
+    return out;
+  }
+
+  function markdownDiffLines(diffs){
+    const list = diffs || [];
+    if (!list.length) return [];
+    const out = [
+      '| Change | Mod | Version | Status | Detail |',
+      '| --- | --- | --- | --- | --- |',
+    ];
+    list.forEach(d => {
+      out.push('| ' + [
+        mdCell(d.change),
+        mdLink(d.row.name, d.row.sourceUrl),
+        mdCell(d.row.version),
+        mdCell(statusLabel(d.row.enabled)),
+        mdCell(d.change === 'changed' ? diffDetail(d) : ''),
+      ].join(' | ') + ' |');
+    });
+    return out;
+  }
+
+  function bbcodeDiffLines(diffs){
+    const list = diffs || [];
+    if (!list.length) return [];
+    const out = ['[list]'];
+    list.forEach(d => {
+      const detail = d.change === 'changed' ? diffDetail(d) : statusLabel(d.row.enabled);
+      out.push('[*][b]' + bbSafe(d.change) + '[/b] ' + bbLink(d.row.name, d.row.sourceUrl) +
+        (detail && detail !== '—' ? ' — ' + bbSafe(detail) : ''));
+    });
+    out.push('[/list]');
+    return out;
+  }
+
   // Sizes come out of the state file in bytes. Vortex reports whole-mod size
   // as modSize and the downloaded archive as fileSize; prefer the former.
   function formatSize(bytes){
@@ -1432,16 +1580,41 @@
     download('vortex-modlist-all-games.csv', lines.join('\n'), 'text/csv');
   });
 
+  // BBCode has no file extension anyone agrees on, and it is pasted into a
+  // forum rather than opened, so it downloads as .txt like the plain export.
+  const SHARE_EXT = { text: '.txt', markdown: '.md', bbcode: '.txt' };
+  const SHARE_MIME = { text: 'text/plain', markdown: 'text/markdown', bbcode: 'text/plain' };
+  const SHARE_LABEL = { text: 'text', markdown: 'Markdown', bbcode: 'BBCode' };
+
+  // The clipboard and the text download share one body; the select picks
+  // which renderer builds it. textLines() already routes the diff view
+  // itself, so only the two new formats branch on it here.
+  function shareLines(){
+    const fmt = shareFormat.value;
+    const isDiff = view === 'diff';
+    if (fmt === 'markdown') return isDiff ? markdownDiffLines(visibleDiff) : markdownLines(currentRows);
+    if (fmt === 'bbcode') return isDiff ? bbcodeDiffLines(visibleDiff) : bbcodeLines(currentRows);
+    return textLines();
+  }
+
+  function updateShareLabels(){
+    copyBtn.textContent = 'Copy as ' + SHARE_LABEL[shareFormat.value];
+    txtBtn.textContent = 'Download ' + SHARE_EXT[shareFormat.value];
+  }
+
+  shareFormat.addEventListener('change', updateShareLabels);
+  updateShareLabels();
+
   txtBtn.addEventListener('click', () => {
-    download(exportBaseName() + (view === 'diff' ? '-changes' : '') + '.txt',
-      textLines().join('\n'), 'text/plain');
+    download(exportBaseName() + (view === 'diff' ? '-changes' : '') + SHARE_EXT[shareFormat.value],
+      shareLines().join('\n'), SHARE_MIME[shareFormat.value]);
   });
 
   copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(textLines().join('\n')).then(() => {
+    navigator.clipboard.writeText(shareLines().join('\n')).then(() => {
       copyBtn.textContent = 'Copied ✓';
       copyBtn.classList.add('copied');
-      setTimeout(() => { copyBtn.textContent = 'Copy as text'; copyBtn.classList.remove('copied'); }, 1600);
+      setTimeout(() => { copyBtn.classList.remove('copied'); updateShareLabels(); }, 1600);
     });
   });
 })();

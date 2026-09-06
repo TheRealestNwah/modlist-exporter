@@ -4,7 +4,7 @@
 
 Browse and export your installed mods from your mod manager. Supports Vortex
 and Mod Organizer 2. Runs entirely in your browser, with exports available as
-CSV, plain text, or clipboard copy.
+CSV, plain text, Markdown, BBCode, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
@@ -42,6 +42,8 @@ CSV, plain text, or clipboard copy.
   them: added, removed, enabled/disabled, version bumps, and priority moves
 - Export as CSV, plain `.txt`, or copy straight to clipboard (the changes
   view exports too, as `*-changes.csv` / `*-changes.txt`)
+- **Markdown and BBCode** — a format picker next to the export buttons, for
+  posting a load order on a forum, a wiki, or in a repo
 - **All-games export** — every Vortex game in one CSV with a `Game` column,
   for when you want the whole setup rather than one game at a time
 
@@ -75,7 +77,9 @@ self-contained file with nothing to import, `test/extract.js` lifts the pure
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
-`formatSize`, `matchesQuery`, `statusLabel` and `csvCell`.
+`formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
+`mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
+`bbcodeLines`, `markdownDiffLines` and `bbcodeDiffLines`.
 
 That list is maintained by hand. Adding a helper that existing functions call,
 without adding it here, breaks a lot of tests at once — which is loud, but
@@ -90,8 +94,8 @@ order, the Vortex attribute fallbacks, Nexus mod and collection link
 construction (including rejecting a malformed slug), collection membership
 matching and uninstalled-member detection, endorsement states, size
 formatting and sorting, the all-games export's per-game profile selection,
-the tri-state enabled/unknown status, every diff classification, and the CSV
-formula-injection guard.
+the tri-state enabled/unknown status, every diff classification, the CSV
+formula-injection guard, and the Markdown and BBCode escaping.
 
 `render()` is deliberately split in two: `viewState()` decides *what* should
 be shown — filtering, sorting, column visibility, totals — and `render()` does
@@ -174,8 +178,10 @@ In both cases:
   `JSON.parse` entirely in-browser.
 - The browser's `File.lastModified` timestamp is checked against the current
   time to warn if the snapshot looks stale.
-- Results render into a table with CSV / .txt / clipboard export. Sorting is
-  by name, install size, or — for MO2 files only — priority order. Every
+- Results render into a table with CSV / .txt / clipboard export, where the
+  copy and text-download buttons render as plain text, Markdown or BBCode.
+  Sorting is by name, install size, or — for MO2 files only — priority
+  order. Every
   column and sort option hides itself where the format carries no such data:
   MO2 files have no sizes, collections or endorsement state, and Vortex files
   have no equivalent of MO2's priority order.
@@ -189,7 +195,11 @@ In both cases:
   cells are built as DOM text nodes rather than HTML, Nexus links are only
   constructed when the game and mod IDs actually look like IDs, and CSV
   fields that begin with `=`, `+`, `-` or `@` are quote-prefixed so
-  spreadsheet apps don't evaluate them as formulas.
+  spreadsheet apps don't evaluate them as formulas. The Markdown export
+  escapes the characters that would end a table cell or open a link, and
+  entity-escapes `<` since Markdown passes raw HTML to the renderer. BBCode
+  has no escape its forum software agrees on, so square brackets in a name
+  are swapped for parentheses — lossy, but it can't open a tag.
 
 ## Collection membership, and why it's a guess
 
@@ -221,6 +231,26 @@ neither has a usable md5, and a mod belonging to two collections lists both.
 Collections are never listed as members of themselves. Membership is
 deliberately **not** compared in the changes view — a mod's collection rarely
 changes, and matching noise there would be worse than the signal.
+
+## Sharing a load order
+
+The format picker in the export bar switches the **Copy** and text **Download**
+buttons between plain text, Markdown and BBCode. The other two buttons are
+unaffected — CSV is always CSV.
+
+Markdown writes a table, with the mod name as a link to its Nexus page where
+there is one. Columns follow the same rule as the page itself: `#`, size,
+collection and endorsement appear only if the loaded file carries them. The
+Source and Source URL columns the CSV needs are left out, since the linked
+name already carries both.
+
+BBCode writes a `[list]` rather than a table, because forum table markup isn't
+portable across forum software. Where an order exists it's written into each
+line as text rather than left to `[list=1]` auto-numbering — the table can be
+sorted by name while still holding MO2 priority numbers, and auto-numbering
+would quietly renumber the load order to match the sort.
+
+Both formats also work in the changes view, exporting the diff instead.
 
 ## Exporting every game at once
 
@@ -323,7 +353,9 @@ records mod name and enabled state; version numbers and source links aren't
 part of this format, so those columns will show as empty for MO2 files.
 
 Exports are named after the detected format: `vortex-modlist.csv` /
-`mo2-modlist.csv`, and likewise for `.txt`. The changes view adds
+`mo2-modlist.csv`, and likewise for `.txt`. Markdown downloads as `.md`;
+BBCode downloads as `.txt`, since no extension for it is standard and it's
+meant to be pasted into a forum rather than opened. The changes view adds
 `-changes`, and the all-games export is `vortex-modlist-all-games.csv`.
 
 #### Priority order in modlist.txt
@@ -358,10 +390,10 @@ comparable ordering.
       collection members that aren't installed
 - [x] Endorsement status, with a filter for mods not yet endorsed
 - [x] Export every Vortex game at once, in one CSV
+- [x] Markdown / BBCode export, for sharing a load order on a forum
 - [ ] Surface Vortex load order when present in the state file
       (game-extension dependent)
 - [ ] Folder-watch / auto-refresh via the File System Access API
-- [ ] Markdown / BBCode export, for sharing a load order on a forum
 
 ## AI disclosure
 
