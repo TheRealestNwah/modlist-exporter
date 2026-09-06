@@ -8,10 +8,11 @@ name: Cut release
 # suite has to pass first — a tag is permanent, so it should not be put on a
 # commit nobody checked.
 #
-# One caveat worth knowing: a release created with the built-in GITHUB_TOKEN
-# does NOT trigger other workflows, so deploy.yml will not fire for a release
-# cut this way. Use the "Run workflow" button on Deploy to Pages afterwards if
-# the live site needs to move.
+# A release created with the built-in GITHUB_TOKEN does not raise events that
+# start other workflows, so deploy.yml's release: published trigger never fires
+# for a release cut here. Rather than storing a personal access token purely to
+# work around that, this calls deploy.yml directly as a second job. One button
+# tags, tests, releases and deploys.
 
 on:
   workflow_dispatch:
@@ -67,3 +68,14 @@ jobs:
             --notes-file "$RUNNER_TEMP/notes.md" \
             --target "$GITHUB_SHA" \
             "$ASSET"
+
+  # Runs only if the release job succeeded, so a failed tag never deploys.
+  # Permissions have to be granted here: a called workflow gets what the
+  # caller gives it, not what it declares for itself.
+  deploy:
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
