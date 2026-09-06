@@ -21,5 +21,13 @@ jobs:
         with:
           node-version: '22'
       # No dependencies to install: the suite uses node:test and lifts the
-      # pure functions straight out of index.html.
+      # pure functions straight out of index.html. The smoke tests drive a
+      # real browser over the DevTools protocol, using the Chrome already on
+      # the runner -- still nothing to install.
+      #
+      # SMOKE_REQUIRED makes a missing browser fail rather than skip. Without
+      # it a runner without Chrome would go green having tested none of the
+      # wiring, which is worse than not having the tests.
       - run: node --test test/*.test.js
+        env:
+          SMOKE_REQUIRED: '1'
