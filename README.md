@@ -44,6 +44,8 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   view exports too, as `*-changes.csv` / `*-changes.txt`)
 - **Markdown and BBCode** — a format picker next to the export buttons, for
   posting a load order on a forum, a wiki, or in a repo
+- **Three themes** — Midnight, Nexus and Liquid Glass, picked in the header
+  and remembered per browser
 - **All-games export** — every Vortex game in one CSV with a `Game` column,
   for when you want the whole setup rather than one game at a time
 
@@ -75,14 +77,19 @@ node --test test/*.test.js
 
 No dependencies and no build step. Because `index.html` is deliberately one
 self-contained file with nothing to import, `test/extract.js` lifts the pure
-(DOM-free) functions out of its `<script>` block and evaluates them:
+(DOM-free) functions out of it and evaluates them. There are two script
+elements — a small one in the head that applies the stored theme before first
+paint, and the main one at the end — so the harness picks the block by looking
+for the one that defines `parseModlist()` rather than by position. The
+functions it lifts:
 `parseMO2`, `parseModlist`, `buildRows`, `viewState`, `diffRows`,
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
-`bbcodeLines`, `markdownDiffLines` and `bbcodeDiffLines`.
+`bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `themeIds`,
+`resolveTheme` and `themeMeta`.
 
 That list is maintained by hand. Adding a helper that existing functions call,
 without adding it here, breaks a lot of tests at once — which is loud, but
@@ -98,7 +105,8 @@ construction (including rejecting a malformed slug), collection membership
 matching and uninstalled-member detection, endorsement states, size
 formatting and sorting, the all-games export's per-game profile selection,
 the tri-state enabled/unknown status, every diff classification, the CSV
-formula-injection guard, and the Markdown and BBCode escaping.
+formula-injection guard, the Markdown and BBCode escaping, and the theme
+resolution that decides what a stored preference means.
 
 `render()` is deliberately split in two: `viewState()` decides *what* should
 be shown — filtering, sorting, column visibility, totals — and `render()` does
@@ -234,6 +242,38 @@ neither has a usable md5, and a mod belonging to two collections lists both.
 Collections are never listed as members of themselves. Membership is
 deliberately **not** compared in the changes view — a mod's collection rarely
 changes, and matching noise there would be worse than the signal.
+
+## Themes
+
+Three, picked from the header and remembered in `localStorage` per browser:
+
+- **Midnight** — the default. Dark, violet accent.
+- **Nexus** — near-black with amber calls to action, in the spirit of the site
+  most of these mods come from.
+- **Liquid Glass** — light and translucent: surfaces blur what is behind them,
+  over a lit background that gives them something to refract.
+
+A theme is a block of custom properties. Colour, the tints behind badges and
+notices, the text that sits on a solid fill, and the corner radii are all
+tokens on `:root`, so a theme mostly restates values rather than rewriting
+rules. Liquid Glass is the one that adds rules of its own, for the blur and
+the bright inner edge along the top of each surface.
+
+Two details that are easy to miss:
+
+- Native controls — checkboxes, the select chevron, the mobile browser chrome —
+  follow the `color-scheme` and `theme-color` meta tags, not our variables. The
+  switcher rewrites both. Without that, an unchecked box on the light theme
+  paints as a solid dark square.
+- The stored preference is applied by a small script in the head, before the
+  body paints, or the default would flash first. Anything unrecognised in
+  storage resolves back to Midnight, since what is in there is whatever was
+  last written — including by an older version of this file.
+
+Liquid Glass drops to opaque surfaces on a flat background under
+`prefers-reduced-transparency: reduce`, which is what macOS and iOS set from
+their Reduce Transparency switch, and does the same where the browser cannot
+blur at all.
 
 ## Sharing a load order
 

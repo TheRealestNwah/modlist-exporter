@@ -10,7 +10,8 @@ const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matche
         missingCollectionMembers, endorsementLabel, isUnendorsed,
         defaultProfileFor, gamesWithMods, allGamesRows,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
-        markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines } = require('./extract.js');
+        markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
+        themeIds, resolveTheme, themeMeta } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -876,6 +877,45 @@ test('diff exports escape a hostile name in both formats', () => {
   assert.ok(md[2].indexOf('A\\|B') !== -1, md[2]);
   const bb = bbcodeDiffLines([D('added', V('x', { name: '[b]A[/b]' }))]);
   assert.strictEqual(bb[1], '[*][b]added[/b] (b)A(/b) — enabled');
+});
+
+// --------------------------------------------------------------- theming
+
+test('themeIds: the picker offers exactly the themes that have a block', () => {
+  assert.deepStrictEqual(themeIds(), ['midnight', 'nexus', 'glass']);
+});
+
+test('resolveTheme: a known id passes through', () => {
+  themeIds().forEach((id) => assert.strictEqual(resolveTheme(id), id));
+});
+
+test('resolveTheme: anything unrecognised falls back to the default', () => {
+  // What comes out of storage is whatever was last written there, including by
+  // an older version of this file. A value with no block behind it would leave
+  // the page unstyled rather than merely wrong.
+  ['', 'sepia', 'MIDNIGHT', ' glass', null, undefined, 0, {}].forEach((bad) => {
+    assert.strictEqual(resolveTheme(bad), 'midnight', JSON.stringify(bad) + ' should fall back');
+  });
+});
+
+test('themeMeta: every theme declares a colour scheme and a chrome colour', () => {
+  themeIds().forEach((id) => {
+    const m = themeMeta(id);
+    assert.match(m.colorScheme, /^(light|dark)$/, id + ' needs a real color-scheme');
+    assert.match(m.themeColor, /^#[0-9a-f]{6}$/, id + ' needs a hex theme-color');
+  });
+});
+
+test('themeMeta: the light theme is the only one asking for light controls', () => {
+  // Native checkboxes and the select chevron follow color-scheme, not our
+  // variables -- getting this wrong paints a dark checkbox on a white page.
+  assert.strictEqual(themeMeta('glass').colorScheme, 'light');
+  assert.strictEqual(themeMeta('midnight').colorScheme, 'dark');
+  assert.strictEqual(themeMeta('nexus').colorScheme, 'dark');
+});
+
+test('themeMeta: an unknown theme gets the default metadata, not undefined', () => {
+  assert.deepStrictEqual(themeMeta('nope'), themeMeta('midnight'));
 });
 
 // -------------------------------------------------- optional: real backups
