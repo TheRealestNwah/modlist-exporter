@@ -280,6 +280,12 @@
   .game-pick{ display: flex; align-items: center; gap: 8px; cursor: pointer; }
   .game-pick input{ accent-color: var(--accent); }
   .game-pick .count{ color: var(--ink-dim); opacity: .75; }
+  .bulk-go-row{
+    justify-content: flex-end;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
 
   table{
     margin-top: 14px;
@@ -1041,20 +1047,25 @@
       <button id="copyBtn">Copy as text</button>
       <button id="csvBtn">Download CSV</button>
       <button id="txtBtn">Download .txt</button>
-      <button id="pickGamesBtn" aria-expanded="false" aria-controls="gamePicker" title="Choose which games the bulk export covers">Choose games</button>
-      <button id="allGamesBtn" title="Every game in one CSV, with a Game column">All games CSV</button>
+      <button id="bulkBtn" aria-expanded="false" aria-controls="gamePicker" title="Several games in one CSV, with a Game column">Bulk CSV</button>
     </div>
   </div>
 
   <div class="game-picker" id="gamePicker" hidden>
     <div class="game-picker-head">
-      <span id="gamePickerSummary">Games in the bulk export</span>
+      <span>Games to include</span>
       <span class="game-picker-actions">
         <button type="button" class="picker-link" id="gamePickAll">Select all</button>
         <button type="button" class="picker-link" id="gamePickNone">Select none</button>
       </span>
     </div>
     <div class="game-picker-list" id="gamePickerList"></div>
+    <!-- Carries the export-bar class because that is what it is: a row of
+         export buttons. It inherits every theme's button treatment that way,
+         including the terminal brackets, rather than restating them. -->
+    <div class="export-btns bulk-go-row">
+      <button id="bulkGoBtn">Download all games CSV</button>
+    </div>
   </div>
 
   <div class="table-scroll">
@@ -1143,11 +1154,10 @@
   const notEndorsed = document.getElementById('notEndorsed');
   const notEndorsedField = document.getElementById('notEndorsedField');
   const missingNote = document.getElementById('missingNote');
-  const allGamesBtn = document.getElementById('allGamesBtn');
-  const pickGamesBtn = document.getElementById('pickGamesBtn');
+  const bulkBtn = document.getElementById('bulkBtn');
+  const bulkGoBtn = document.getElementById('bulkGoBtn');
   const gamePicker = document.getElementById('gamePicker');
   const gamePickerList = document.getElementById('gamePickerList');
-  const gamePickerSummary = document.getElementById('gamePickerSummary');
   const gamePickAll = document.getElementById('gamePickAll');
   const gamePickNone = document.getElementById('gamePickNone');
   const diffFilters = document.getElementById('diffFilters');
@@ -1433,28 +1443,26 @@
     updateBulkExport();
   }
 
-  // The button says what it will actually do: with a selection made, "All
-  // games CSV" would be a lie about the file you are about to get.
+  // The download button says what it will actually do, since it sits right
+  // under the boxes that decide it.
   function updateBulkExport(){
     const total = gamesWithMods(parsed).length;
     const n = selectedGames.length;
-    allGamesBtn.disabled = n === 0;
-    allGamesBtn.textContent = n === total ? 'All games CSV'
-      : n === 1 ? '1 game CSV' : n + ' games CSV';
-    gamePickerSummary.textContent = n === total
-      ? 'All ' + total + ' games in the bulk export'
-      : n + ' of ' + total + ' games in the bulk export';
+    bulkGoBtn.disabled = n === 0;
+    bulkGoBtn.textContent = n === 0 ? 'Download CSV'
+      : n === total ? 'Download all ' + total + ' games CSV'
+      : n === 1 ? 'Download 1 game CSV'
+      : 'Download ' + n + ' games CSV';
   }
 
   function showBulkExport(on){
-    allGamesBtn.style.display = on ? '' : 'none';
-    pickGamesBtn.style.display = on ? '' : 'none';
+    bulkBtn.style.display = on ? '' : 'none';
     if (!on) setGamePickerOpen(false);
   }
 
   function setGamePickerOpen(open){
     gamePicker.hidden = !open;
-    pickGamesBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    bulkBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function populateMO2(){
@@ -2377,7 +2385,12 @@
     download(exportBaseName() + '.csv', lines.join('\n'), 'text/csv');
   });
 
-  pickGamesBtn.addEventListener('click', () => setGamePickerOpen(gamePicker.hidden));
+  bulkBtn.addEventListener('click', () => setGamePickerOpen(gamePicker.hidden));
+  // A panel that opens from a button should close on Escape like any other.
+  // Focus goes back to the button it came from, or it lands nowhere.
+  gamePicker.addEventListener('keydown', e => {
+    if (e.key === 'Escape'){ setGamePickerOpen(false); bulkBtn.focus(); }
+  });
   gamePickAll.addEventListener('click', () => setAllGamePicks(true));
   gamePickNone.addEventListener('click', () => setAllGamePicks(false));
 
@@ -2386,7 +2399,7 @@
     readGamePicks();
   }
 
-  allGamesBtn.addEventListener('click', () => {
+  bulkGoBtn.addEventListener('click', () => {
     if (!selectedGames.length) return;
     const rows = allGamesRows(parsed, {
       onlyEnabled: onlyEnabled.checked,
@@ -2408,6 +2421,7 @@
         r.source, r.sourceUrl || '',
       ].map(csvCell).join(','));
     });
+    setGamePickerOpen(false);
     download(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines.join('\n'), 'text/csv');
   });
 
