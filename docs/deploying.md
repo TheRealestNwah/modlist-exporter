@@ -10,6 +10,29 @@ those changes live. Pushing a bare tag isn't enough — the release itself has
 to be published. There's a manual "Run workflow" button on the Actions tab if
 you ever need to redeploy without cutting a release.
 
+## Cutting a release is one button
+
+Dispatch **Cut release** from the Actions tab with a version and release notes.
+It runs the tests, tags the commit it was dispatched against, creates the
+release with the versioned `.html` attached, and then deploys — all in one run.
+
+That last step needs explaining, because it looks redundant next to the
+`release: published` trigger. A release created with the built-in
+`GITHUB_TOKEN` deliberately does not raise events that start other workflows;
+it's how GitHub stops a workflow from triggering itself forever. So the
+release this workflow creates never fires `release: published`, and before
+this the live site had to be moved by hand afterwards.
+
+The fix is for `release.yml` to *call* `deploy.yml` rather than wait to be
+triggered by it, which `workflow_call` allows. A called workflow receives the
+permissions the caller grants it, so `release.yml` grants `pages: write` and
+`id-token: write` on that job. The alternative — storing a personal access
+token as a secret purely so the release event fires — would work too, but
+means a long-lived credential in the repo for no other reason.
+
+Releases published through the GitHub web UI still arrive the ordinary way,
+via `release: published`.
+
 ## The github-pages environment needs a tag policy
 
 This is repository configuration, not something in this repo, and it is easy
