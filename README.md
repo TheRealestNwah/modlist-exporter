@@ -221,15 +221,15 @@ Seven, picked from the header and remembered in `localStorage` per browser:
   up only where the real app used it: the activated-mod checkmark.
 - **Liquid Glass** — light and translucent: surfaces blur what is behind them,
   over a lit background that gives them something to refract.
-- **UESP** — a MediaWiki skin, not an app, and specifically UESP's own navy
-  identity rather than Wikipedia's: a darker, richer blue than the generic
-  wiki-link colour, pale blue rather than neutral grey behind a table
-  header, and boxed cells the way MediaWiki's own `wikitable` class draws
-  them. Links are underlined outright rather than on hover, which every
-  other theme here deliberately doesn't do. (This session's network policy
-  blocks the live site and its stylesheet, and the skin's own GitHub repo
-  turned out to hold only PHP templating with no colours in it — so this is
-  a best match, not a colour lifted from the source.)
+- **UESP** — a MediaWiki skin, not an app, and specifically UESP's own:
+  warm cream/parchment rather than white, a lavender-grey for chrome
+  surfaces, a medium web blue for links, and gently rounded panels rather
+  than the sharp corners a wiki page usually has. Matched against a
+  screenshot of the live site — this session's network policy blocks
+  `uesp.net` itself, and the skin's own GitHub repo turned out to hold only
+  PHP templating with no colours in it, so a screenshot was the only way
+  to get this right after two earlier, unverified guesses (plain
+  Wikipedia grey-and-blue, then an invented navy palette) both missed.
 - **Fallout 3 terminal** — a monochrome CRT readout: green phosphor on
   black, square corners, a scanline-and-vignette overlay, and every
   clickable thing in brackets the way a terminal menu option reads as

@@ -626,52 +626,48 @@
   }
 
   /* --- UESP ----------------------------------------------------------
-     A MediaWiki skin, not an app -- and specifically UESP's own, not
-     Wikipedia's. UESP predates the current Wikipedia palette by years and
-     has kept a navy-blue identity the whole time: a darker, richer blue
-     than the generic wiki-blue link colour, and pale blue rather than
-     neutral grey for a data table's header row. Boxed cells and near-square
-     corners stay, since those are MediaWiki structure, not UESP branding.
-
-     Recorded honestly: this session's network policy blocks en.uesp.net and
-     www.uesp.net outright, so these values are not read off the live site or
-     its stylesheet. UESP's own skin repository (github.com/uesp/wikiuespvector)
-     was checked directly and contains only PHP templating -- the actual
-     colours live in a wiki-hosted Common.css page that isn't in version
-     control and wasn't reachable either. This is the closest match available
-     without that page's exact values. */
+     UESP's real skin, not generic MediaWiki: warm parchment/cream rather
+     than white or blue-grey, a cool lavender-grey for chrome surfaces, a
+     medium web blue for links (not a dark navy), and a soft rounded box
+     for content rather than a sharp-cornered one -- confirmed against a
+     screenshot of the live site after two earlier, unverified guesses
+     (generic Wikipedia grey-and-blue, then an invented "navy identity")
+     both turned out wrong. The heading face is serif against a sans body,
+     which is the one place this skin breaks from a typical wiki page. */
   [data-theme="uesp"]{
     color-scheme: light;
-    --bg: #eef2f8;
-    --panel: #ffffff;
-    --panel-2: #dce6f5;
-    --line: #7a97c2;
-    --ink: #14213d;
-    --ink-dim: #43537a;
-    --accent: #1b3d6d;
-    --accent-dim: #1b3d6d;
+    --bg: #f2e2c4;
+    --panel: #fdfce7;
+    --panel-2: #e1e1ea;
+    --line: #c9a3a3;
+    --ink: #1a1a1a;
+    --ink-dim: #6b5f52;
+    --accent: #1a5cb0;
+    --accent-dim: #1a5cb0;
     --good: #14866d;
     --bad: #d73333;
     --good-tint: rgba(20,134,109,0.12);
     --good-edge: rgba(20,134,109,0.35);
     --bad-tint: rgba(215,51,51,0.10);
     --bad-edge: rgba(215,51,51,0.32);
-    --accent-tint: rgba(27,61,109,0.10);
-    --accent-ink: #1b3d6d;
+    --accent-tint: rgba(26,92,176,0.10);
+    --accent-ink: #1a5cb0;
     --on-accent: #ffffff;
     --on-good: #ffffff;
-    --thead-bg: #dce6f5;
-    --r-control: 2px;
-    --r-btn: 2px;
-    --r-badge: 2px;
-    --r-panel: 2px;
-    --r-drop: 2px;
+    --thead-bg: #e1e1ea;
+    --r-control: 6px;
+    --r-btn: 6px;
+    --r-badge: 4px;
+    --r-panel: 8px;
+    --r-drop: 8px;
     --sans: Arial, Helvetica, 'Helvetica Neue', sans-serif;
     --mono: Consolas, 'Courier New', Courier, monospace;
   }
-  /* Every real wiki link is underlined and plain-filled, not a button --
-     the closest a MediaWiki skin has to a "button" is a bordered tab like
-     Edit or View history, which is what these borrow their look from. */
+  /* The page's own H1 is serif; nothing else on the real site is, so this
+     stays scoped to the title rather than becoming a second font stack. */
+  [data-theme="uesp"] h1{ font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
+  /* The closest thing to a "button" on the real page is a bordered chrome
+     surface -- the content box's own border colour, not a filled shape. */
   [data-theme="uesp"] .export-btns button{
     background: var(--panel);
     color: var(--accent);
@@ -692,16 +688,9 @@
     color: var(--accent);
     border-color: var(--accent);
   }
-  /* Real wiki links are underlined without needing a hover to reveal it --
-     the one thing every other theme here deliberately doesn't do. Scoped to
-     the link itself, not the dropzone or the disclosure summary: those are
-     controls, not hyperlinks, and text-decoration set on a block paints
-     through its own descendants regardless of what they declare, so the
-     mistake to avoid is putting it anywhere but the actual <a>. */
-  [data-theme="uesp"] .src a{ text-decoration: underline; }
-  /* The exact border and header fill MediaWiki's own `wikitable` class
-     uses, cell-boxed rather than row-divided -- what turns a list into a
-     reference table. */
+  /* Real wiki tables are boxed cell-by-cell rather than row-divided, which
+     is what turns a list into a reference table; the header fill reuses
+     the same lavender-grey the site's own chrome uses elsewhere. */
   [data-theme="uesp"] thead th{ border: 1px solid var(--line); }
   [data-theme="uesp"] tbody td{ border: 1px solid var(--line); }
   [data-theme="uesp"] tbody tr:hover{ background: var(--panel-2); }
@@ -1162,7 +1151,7 @@
     if (id === 'vortex') return { colorScheme: 'dark', themeColor: '#101114' };
     if (id === 'nmm') return { colorScheme: 'light', themeColor: '#f0f0f0' };
     if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
-    if (id === 'uesp') return { colorScheme: 'light', themeColor: '#eef2f8' };
+    if (id === 'uesp') return { colorScheme: 'light', themeColor: '#f2e2c4' };
     if (id === 'fo3') return { colorScheme: 'dark', themeColor: '#030d03' };
     if (id === 'nv') return { colorScheme: 'dark', themeColor: '#0d0700' };
     return { colorScheme: 'dark', themeColor: '#16141c' };
