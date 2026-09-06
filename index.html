@@ -992,8 +992,11 @@
     <div class="dz-sub">Vortex: state.json · startup.json · hourly.json — MO2: modlist.txt</div>
     <input type="file" id="fileInput" accept=".json,application/json,.txt,text/plain">
   </div>
-  <div class="status" id="status"></div>
-  <div class="freshness" id="freshness"></div>
+  <!-- The drop zones are operable from the keyboard, so the outcome of using
+       them has to be announced: without a live region, loading a file, or
+       failing to, happens in silence for a screen reader. -->
+  <div class="status" id="status" role="status"></div>
+  <div class="freshness" id="freshness" role="status"></div>
 
   <div class="controls" id="controls">
     <div class="field" id="gameField">
@@ -1037,9 +1040,10 @@
   <div class="diff-basis" id="diffBasis"></div>
 
   <div class="summary-bar" id="summaryBar">
-    <div class="count"><strong id="modCount">0</strong> <span id="countLabel">mods</span><span class="size-total" id="sizeTotal"></span></div>
+    <div class="count" role="status"><strong id="modCount">0</strong> <span id="countLabel">mods</span><span class="size-total" id="sizeTotal"></span></div>
     <div class="export-btns">
-      <select id="shareFormat" title="Format for the copy and text download buttons">
+      <select id="shareFormat" aria-label="Format for the copy and text download buttons"
+        title="Format for the copy and text download buttons">
         <option value="text">Plain text</option>
         <option value="markdown">Markdown</option>
         <option value="bbcode">BBCode</option>
@@ -1101,7 +1105,7 @@
 
   <div class="missing-note" id="missingNote"></div>
 
-  <div class="empty-note" id="emptyNote">No mods match the current filter.</div>
+  <div class="empty-note" id="emptyNote" role="status">No mods match the current filter.</div>
 
   <div class="compare-wrap" id="compareWrap">
     <div class="compare-lead">Compare against a second file to see what changed between them — added, removed, enabled/disabled, and version bumps.</div>
@@ -1110,7 +1114,7 @@
       <div class="dz-sub">an older or newer snapshot from the same mod manager</div>
       <input type="file" id="compareInput" accept=".json,application/json,.txt,text/plain">
     </div>
-    <div class="status" id="compareStatus"></div>
+    <div class="status" id="compareStatus" role="status"></div>
   </div>
 </div>
 

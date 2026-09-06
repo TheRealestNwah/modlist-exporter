@@ -139,8 +139,21 @@ is how a column ends up in an export that wasn't in the view it came from, so
 they now share one answer and one test.
 
 That leaves the wiring untested — whether a listener is attached, whether an
-element ID is right. Those fail loudly on first load rather than silently
-producing wrong output, which is why this trade is worth making.
+element ID is right. Most of those fail loudly on first load: a missing element
+throws, a missing listener means a button does nothing.
+
+Not all of them, though, and it is worth being honest about the one that got
+through. Loading a new file while the changes view was open reset `view` but
+none of the chrome that goes with it, so the summary bar read "4 changes" over
+a mod list. Nothing threw, nothing looked broken unless you had taken that
+exact path, and it shipped across several releases before anyone noticed. The
+trade is still the right one for a single file with no build step — but the
+reason it is worth making is that these bugs are *rare and cheap*, not that
+they are all loud.
+
+What actually catches them is driving the page: load a file, compare a second,
+switch views, export from each. Worth doing before a release that touched the
+render or view layer, since the suite deliberately cannot.
 
 One test is skipped unless you have local Vortex backups: if
 `%APPDATA%\Vortex\temp\state_backups_full\` holds two or more state files, it
