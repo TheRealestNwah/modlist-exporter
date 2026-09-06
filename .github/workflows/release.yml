@@ -54,7 +54,16 @@ jobs:
             *) echo "::error::Tag '$TAG' should look like 0.9.0, with no leading v"; exit 1 ;;
           esac
           printf '%s' "$NOTES" > "$RUNNER_TEMP/notes.md"
+          # The tool is one self-contained file, so that file is the release
+          # artifact. Uploading it under a versioned name means someone can
+          # download one thing and open it -- no unzip, and no puzzling a week
+          # later over which index.html is sitting in Downloads. Without this
+          # the only downloads are GitHub's auto-generated source archives,
+          # which are the whole repo, tests and workflows included.
+          ASSET="$RUNNER_TEMP/modlist-exporter-$TAG.html"
+          cp index.html "$ASSET"
           gh release create "$TAG" \
             --title "v$TAG" \
             --notes-file "$RUNNER_TEMP/notes.md" \
-            --target "$GITHUB_SHA"
+            --target "$GITHUB_SHA" \
+            "$ASSET"
