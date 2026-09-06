@@ -8,7 +8,7 @@ const path = require('node:path');
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
         collectionMembership, collectionLabel, viewState,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
-        defaultProfileFor, gamesWithMods, allGamesRows,
+        defaultProfileFor, gamesWithMods, allGamesRows, allGamesFileName,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
         themeIds, resolveTheme, themeMeta } = require('./extract.js');
@@ -668,6 +668,67 @@ test('allGamesRows: an MO2 file exports nothing here', () => {
 test('allGamesRows: no games means no rows rather than a throw', () => {
   assert.deepStrictEqual(allGamesRows(multi({}), {}), []);
   assert.deepStrictEqual(allGamesRows(null, {}), []);
+});
+
+test('allGamesRows: a game selection narrows the export', () => {
+  const src = multi({
+    skyrimse: { a: { attributes: { name: 'A' } } },
+    morrowind: { b: { attributes: { name: 'B' } } },
+    fallout4: { c: { attributes: { name: 'C' } } },
+  });
+  const rows = allGamesRows(src, { games: ['skyrimse', 'fallout4'] });
+  assert.deepStrictEqual(rows.map((r) => r.game), ['skyrimse', 'fallout4']);
+});
+
+test('allGamesRows: the selection follows the file order, not the given order', () => {
+  // Two exports of the same games have to produce the same sheet, whatever
+  // order the boxes happened to be ticked in.
+  const src = multi({
+    skyrimse: { a: { attributes: { name: 'A' } } },
+    morrowind: { b: { attributes: { name: 'B' } } },
+  });
+  const asked = allGamesRows(src, { games: ['morrowind', 'skyrimse'] });
+  assert.deepStrictEqual(asked.map((r) => r.game), ['skyrimse', 'morrowind']);
+});
+
+test('allGamesRows: a game named in the selection but absent is skipped', () => {
+  const src = multi({ skyrimse: { a: { attributes: { name: 'A' } } } });
+  assert.strictEqual(allGamesRows(src, { games: ['skyrimse', 'oblivion'] }).length, 1);
+  assert.strictEqual(allGamesRows(src, { games: [] }).length, 0);
+});
+
+test('allGamesRows: no selection still means every game', () => {
+  const src = multi({
+    skyrimse: { a: { attributes: { name: 'A' } } },
+    morrowind: { b: { attributes: { name: 'B' } } },
+  });
+  assert.strictEqual(allGamesRows(src, {}).length, 2);
+  assert.strictEqual(allGamesRows(src, { games: null }).length, 2);
+});
+
+test('allGamesFileName: a full selection keeps the original name', () => {
+  assert.strictEqual(allGamesFileName(['a', 'b'], 2), 'vortex-modlist-all-games.csv');
+  assert.strictEqual(allGamesFileName([], 2), 'vortex-modlist-all-games.csv');
+});
+
+test('allGamesFileName: a small selection names its games', () => {
+  assert.strictEqual(allGamesFileName(['skyrimse'], 3), 'vortex-modlist-skyrimse.csv');
+  assert.strictEqual(allGamesFileName(['skyrimse', 'fallout4'], 3),
+    'vortex-modlist-skyrimse-fallout4.csv');
+});
+
+test('allGamesFileName: more than three games is not a filename', () => {
+  assert.strictEqual(allGamesFileName(['a', 'b', 'c', 'd'], 9),
+    'vortex-modlist-selected-games.csv');
+});
+
+test('allGamesFileName: a game id that is not a plain slug never reaches the name', () => {
+  // Game ids come out of the state file, so they are not trusted to be safe
+  // path segments.
+  assert.strictEqual(allGamesFileName(['../etc/passwd'], 3),
+    'vortex-modlist-selected-games.csv');
+  assert.strictEqual(allGamesFileName(['ok', 'has space'], 3),
+    'vortex-modlist-selected-games.csv');
 });
 
 // ------------------------------------------------- markdown / bbcode export

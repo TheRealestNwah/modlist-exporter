@@ -47,8 +47,9 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
 - **Seven themes** — Midnight, Vortex, NMM, Liquid Glass, UESP, and a
   Fallout 3 / New Vegas terminal pair, picked in the header and remembered
   per browser
-- **All-games export** — every Vortex game in one CSV with a `Game` column,
-  for when you want the whole setup rather than one game at a time
+- **Bulk CSV** — several Vortex games in one sheet with a `Game` column, for
+  when you want the whole setup rather than one game at a time; tick the games
+  you want, or leave them all ticked for everything
 
 ## Structure
 
@@ -97,6 +98,7 @@ functions it lifts:
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `defaultProfileFor`, `gamesWithMods`, `allGamesRows`,
+`allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `themeIds`,
@@ -300,12 +302,32 @@ would quietly renumber the load order to match the sort.
 
 Both formats also work in the changes view, exporting the diff instead.
 
-## Exporting every game at once
+## Exporting several games at once
 
-The **All games CSV** button appears when a Vortex file contains more than one
-game. It writes one row per mod across every game, with a `Game` column, fixed
-columns so the sheet stays rectangular, and both the formatted size and the raw
-byte count.
+The **Bulk CSV** button appears when a Vortex file contains more than one game.
+It opens a panel with a checkbox per game — everything ticked to start with, so
+the whole-file export is still two clicks, and narrowing it costs nothing extra.
+**Select all** and **Select none** are there for a file with a lot of games in
+it. A Vortex install picks up games you tried once and abandoned, and their mods
+are just noise in a sheet about the two games you actually play.
+
+The export itself is the button inside the panel, which says what it will
+actually do — *Download 3 games CSV* — since it sits directly under the boxes
+that decide it. It writes one row per mod across the chosen games, with a `Game`
+column, fixed columns so the sheet stays rectangular, and both the formatted
+size and the raw byte count. The panel closes on Escape, and closes itself once
+the file is on its way.
+
+The selection is always written in the file's own game order rather than the
+order the boxes were ticked, so exporting the same games twice produces the
+same sheet. The filename follows the selection too — a full selection stays
+`vortex-modlist-all-games.csv`, up to three games are named
+(`vortex-modlist-skyrimse-fallout4.csv`), and anything larger is
+`vortex-modlist-selected-games.csv` — so two different exports from one file
+don't collide in the downloads folder. Game ids come out of the state file, so
+only plain slugs are allowed into a filename; anything else falls back to the
+generic name rather than being sanitised into something that no longer says
+what it holds.
 
 Deliberately one flat sheet rather than a tab per game: a `Game` column can be
 filtered, sorted and pivoted in any spreadsheet app, which answers "what's my
