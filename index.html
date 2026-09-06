@@ -626,31 +626,41 @@
   }
 
   /* --- UESP ----------------------------------------------------------
-     A MediaWiki skin, not an app: off-white page, boxed tables with the
-     exact grey MediaWiki's own `wikitable` class uses, and the classic
-     wiki-blue links that predate Wikipedia's current palette. Near-square
-     corners, because a wiki page has never had a rounded one. */
+     A MediaWiki skin, not an app -- and specifically UESP's own, not
+     Wikipedia's. UESP predates the current Wikipedia palette by years and
+     has kept a navy-blue identity the whole time: a darker, richer blue
+     than the generic wiki-blue link colour, and pale blue rather than
+     neutral grey for a data table's header row. Boxed cells and near-square
+     corners stay, since those are MediaWiki structure, not UESP branding.
+
+     Recorded honestly: this session's network policy blocks en.uesp.net and
+     www.uesp.net outright, so these values are not read off the live site or
+     its stylesheet. UESP's own skin repository (github.com/uesp/wikiuespvector)
+     was checked directly and contains only PHP templating -- the actual
+     colours live in a wiki-hosted Common.css page that isn't in version
+     control and wasn't reachable either. This is the closest match available
+     without that page's exact values. */
   [data-theme="uesp"]{
     color-scheme: light;
-    --bg: #f8f9fa;
+    --bg: #eef2f8;
     --panel: #ffffff;
-    --panel-2: #eaecf0;
-    --line: #a2a9b1;
-    --ink: #202122;
-    --ink-dim: #54595d;
-    --accent: #002bb8;
-    --accent-dim: #002bb8;
+    --panel-2: #dce6f5;
+    --line: #7a97c2;
+    --ink: #14213d;
+    --ink-dim: #43537a;
+    --accent: #1b3d6d;
+    --accent-dim: #1b3d6d;
     --good: #14866d;
     --bad: #d73333;
     --good-tint: rgba(20,134,109,0.12);
     --good-edge: rgba(20,134,109,0.35);
     --bad-tint: rgba(215,51,51,0.10);
     --bad-edge: rgba(215,51,51,0.32);
-    --accent-tint: rgba(0,43,184,0.10);
-    --accent-ink: #002bb8;
+    --accent-tint: rgba(27,61,109,0.10);
+    --accent-ink: #1b3d6d;
     --on-accent: #ffffff;
     --on-good: #ffffff;
-    --thead-bg: #eaecf0;
+    --thead-bg: #dce6f5;
     --r-control: 2px;
     --r-btn: 2px;
     --r-badge: 2px;
@@ -669,7 +679,7 @@
     font-weight: 400;
   }
   [data-theme="uesp"] .export-btns button:hover{
-    background: #eaf3ff;
+    background: var(--panel-2);
     border-color: var(--accent);
   }
   [data-theme="uesp"] .export-btns button.copied{
@@ -678,7 +688,7 @@
     border-color: var(--good);
   }
   [data-theme="uesp"] .view-tabs button.active{
-    background: #eaf3ff;
+    background: var(--panel-2);
     color: var(--accent);
     border-color: var(--accent);
   }
@@ -694,7 +704,7 @@
      reference table. */
   [data-theme="uesp"] thead th{ border: 1px solid var(--line); }
   [data-theme="uesp"] tbody td{ border: 1px solid var(--line); }
-  [data-theme="uesp"] tbody tr:hover{ background: #eaf3ff; }
+  [data-theme="uesp"] tbody tr:hover{ background: var(--panel-2); }
 
   /* --- Fallout 3 terminal / New Vegas terminal ---------------------------
      A monochrome CRT readout, not a web page: everything in one phosphor
@@ -1152,7 +1162,7 @@
     if (id === 'vortex') return { colorScheme: 'dark', themeColor: '#101114' };
     if (id === 'nmm') return { colorScheme: 'light', themeColor: '#f0f0f0' };
     if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
-    if (id === 'uesp') return { colorScheme: 'light', themeColor: '#f8f9fa' };
+    if (id === 'uesp') return { colorScheme: 'light', themeColor: '#eef2f8' };
     if (id === 'fo3') return { colorScheme: 'dark', themeColor: '#030d03' };
     if (id === 'nv') return { colorScheme: 'dark', themeColor: '#0d0700' };
     return { colorScheme: 'dark', themeColor: '#16141c' };
