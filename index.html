@@ -378,6 +378,25 @@
      it is context rather than a warning: one page legitimately ships several
      files, and each installs as its own mod. */
   .siblings{ opacity: .65; }
+  #orderTable{ display: none; }
+  #orderTable.show{ display: table; }
+  .plugin{ font-family: var(--mono); font-size: 12.5px; }
+  .pos{ font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim);
+        text-align: right; width: 1%; white-space: nowrap; padding-right: 14px; }
+  /* Not an error state: Vortex simply does not record this for every game,
+     so it reads as an explanation rather than a failure. */
+  .order-note{
+    display: none;
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    font-size: 13px;
+    color: var(--ink-dim);
+    line-height: 1.65;
+  }
+  .order-note.show{ display: block; }
   .missing-note{
     display: none;
     margin-top: 18px;
@@ -1035,6 +1054,7 @@
   <div class="view-tabs" id="viewTabs">
     <button id="viewListBtn" class="active">Mod list</button>
     <button id="viewDiffBtn">Changes</button>
+    <button id="viewOrderBtn">Load order</button>
   </div>
 
   <div class="diff-filters" id="diffFilters">
@@ -1111,6 +1131,19 @@
   </table>
   </div>
 
+  <table id="orderTable">
+    <thead>
+      <tr>
+        <th class="pos" title="Position in the plugin load order">#</th>
+        <th>Plugin</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="orderTableBody"></tbody>
+  </table>
+
+  <div class="order-note" id="orderNote"></div>
+
   <div class="missing-note" id="missingNote"></div>
 
   <div class="empty-note" id="emptyNote" role="status">No mods match the current filter.</div>
@@ -1167,6 +1200,10 @@
   const notEndorsed = document.getElementById('notEndorsed');
   const notEndorsedField = document.getElementById('notEndorsedField');
   const missingNote = document.getElementById('missingNote');
+  const viewOrderBtn = document.getElementById('viewOrderBtn');
+  const orderTable = document.getElementById('orderTable');
+  const orderTableBody = document.getElementById('orderTableBody');
+  const orderNote = document.getElementById('orderNote');
   const bulkBtn = document.getElementById('bulkBtn');
   const bulkGoBtn = document.getElementById('bulkGoBtn');
   const gamePicker = document.getElementById('gamePicker');
@@ -1181,6 +1218,7 @@
   let primaryFile = null;   // the File behind `parsed`, kept for its timestamp
   let compareSource = null; // second parsed file, same shape as `parsed`
   let compareFile = null;
+  let currentOrder = []; // the plugin load order currently shown
   let currentDiff = [];   // every comparison result
   let visibleDiff = [];   // what the change-type filters actually show
   let view = 'list';        // 'list' | 'diff'
@@ -1331,7 +1369,14 @@
         const topKeys = json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : '(not an object)';
         return { error: 'No mods found in this file. Top-level keys it does contain: ' + topKeys + '. This is probably the wrong file — the full mod list lives in AppData\\Roaming\\Vortex\\temp\\state_backups_full\\, not the root Vortex folder.' };
       }
-      return { source: { type: 'vortex', mods, profiles: profiles || {} } };
+      return { source: {
+        type: 'vortex',
+        mods,
+        profiles: profiles || {},
+        // Kept for the load-order view. Vortex stores this per profile, and
+        // only for games whose extension reports one at all.
+        loadOrder: (root && root.loadOrder) || {},
+      } };
     }
 
     const entries = parseMO2(text);
@@ -1376,7 +1421,7 @@
       setCompareStatus('');
       viewTabs.classList.remove('show');
       // The populate* call below renders; this only resets the chrome.
-      applyViewChrome(false);
+      applyViewChrome('list');
 
       parsed = res.source;
       primaryFile = file;
@@ -1636,6 +1681,9 @@
     table.classList.toggle('no-coll', !view.hasColl);
     table.classList.toggle('no-endo', !view.hasEndo);
     table.classList.toggle('no-when', !view.hasWhen);
+    // MO2's modlist.txt has no plugins in it at all, so the tab would be a
+    // dead end there rather than an explanation.
+    viewOrderBtn.hidden = !parsed || parsed.type !== 'vortex';
     sortInstalledOption.hidden = !view.hasWhen;
     notEndorsedField.style.display = view.hasEndo ? '' : 'none';
     // Only worth offering when there's more than one game to combine.
@@ -1879,21 +1927,35 @@
   // do it by assigning `view` and hoping -- which left "4 changes" over a mod
   // list, and the changes tab still lit, whenever a file was dropped while
   // the comparison was open.
-  function applyViewChrome(isDiff){
-    view = isDiff ? 'diff' : 'list';
-    viewListBtn.classList.toggle('active', !isDiff);
-    viewDiffBtn.classList.toggle('active', isDiff);
-    if (isDiff){
-      table.classList.remove('show');
-      controls.classList.remove('show');
+  // Owns every piece of chrome that differs between the three views, so a
+  // view change can never leave one view's furniture standing in another's.
+  function applyViewChrome(next){
+    view = (next === 'diff' || next === 'order') ? next : 'list';
+    viewListBtn.classList.toggle('active', view === 'list');
+    viewDiffBtn.classList.toggle('active', view === 'diff');
+    viewOrderBtn.classList.toggle('active', view === 'order');
+
+    // Everything off first; each view then puts back only what it owns.
+    table.classList.remove('show');
+    diffTable.classList.remove('show');
+    orderTable.classList.remove('show');
+    diffBasis.classList.remove('show');
+    diffFilters.classList.remove('show');
+    missingNote.classList.remove('show');
+    orderNote.classList.remove('show');
+    emptyNote.classList.remove('show');
+    controls.classList.remove('show');
+    sizeTotal.textContent = '';
+    showBulkExport(false);
+
+    if (view === 'diff'){
       diffFilters.classList.add('show');
-      sizeTotal.textContent = '';
-      missingNote.classList.remove('show');
-      showBulkExport(false);
+    } else if (view === 'order'){
+      // The game and profile pickers stay: load order is per profile, so
+      // switching either has to keep working here.
+      controls.classList.add('show');
+      countLabel.textContent = 'plugins';
     } else {
-      diffTable.classList.remove('show');
-      diffBasis.classList.remove('show');
-      diffFilters.classList.remove('show');
       controls.classList.add('show');
       countLabel.textContent = 'mods';
       emptyNote.textContent = 'No mods match the current filter.';
@@ -1901,13 +1963,47 @@
   }
 
   function setView(v){
-    applyViewChrome(v === 'diff');
+    applyViewChrome(v);
     refresh();
   }
 
   // Route re-renders through the active view.
+  // The plugin load order for the selected game and profile. Kept separate
+  // from the mod list on purpose: a plugin is a file inside a mod, one mod can
+  // ship several or none, and Vortex only records this for some games.
+  function renderOrder(){
+    if (!parsed) return;
+    const gameId = gameSelect.value;
+    const entries = loadOrderFor(parsed, gameId, profileSelect.value);
+    currentOrder = entries;
+
+    orderTableBody.innerHTML = '';
+    entries.forEach(e => {
+      const tr = document.createElement('tr');
+      cell(tr, 'pos', String(e.position));
+      cell(tr, 'plugin', e.name);
+      badgeIn(cell(tr, ''), e.enabled ? 'on' : 'off', e.enabled ? 'enabled' : 'disabled');
+      orderTableBody.appendChild(tr);
+    });
+
+    // Nothing to show is the expected outcome for most games, so it gets an
+    // explanation rather than an empty table or a bare "no results".
+    const missing = entries.length === 0;
+    orderNote.textContent = missing
+      ? loadOrderNote(gameId, gamesWithLoadOrder(parsed))
+      : '';
+    orderNote.classList.toggle('show', missing);
+    orderTable.classList.toggle('show', !missing);
+
+    modCount.textContent = entries.length;
+    countLabel.textContent = entries.length === 1 ? 'plugin' : 'plugins';
+    summaryBar.classList.add('show');
+  }
+
   function refresh(){
-    if (view === 'diff') renderDiff(); else render();
+    if (view === 'diff') renderDiff();
+    else if (view === 'order') renderOrder();
+    else render();
   }
 
   onlyEnabled.addEventListener('change', refresh);
@@ -1917,6 +2013,7 @@
   filterInputs.forEach(i => i.addEventListener('change', () => { if (view === 'diff') renderDiff(); }));
   viewListBtn.addEventListener('click', () => setView('list'));
   viewDiffBtn.addEventListener('click', () => { if (compareSource) setView('diff'); });
+  viewOrderBtn.addEventListener('click', () => setView('order'));
 
   wireDropZone(compareZone, compareInput, handleCompareFile);
 
@@ -1926,7 +2023,8 @@
 
   // Exports of the changes view are named for it, whatever their format.
   function exportName(ext){
-    return exportBaseName() + (view === 'diff' ? '-changes' : '') + ext;
+    const suffix = view === 'diff' ? '-changes' : (view === 'order' ? '-loadorder' : '');
+    return exportBaseName() + suffix + ext;
   }
 
   function downloadCsv(filename, lines){
@@ -2362,6 +2460,57 @@
     return counts;
   }
 
+  // A game's plugin load order, if Vortex recorded one.
+  //
+  // This is a different list from the mod list, not a column on it. A plugin
+  // is a file inside a mod; one mod can ship several or none, so the two do
+  // not line up. It is kept separate rather than joined for that reason --
+  // and because the entries stand on their own: Vortex records a name and an
+  // enabled flag for every one, so nothing has to be matched back to a mod.
+  //
+  // Load order lives on the profile. With no profile selected, fall back to
+  // the game's own default rather than showing nothing.
+  function loadOrderFor(source, gameId, profileKey){
+    if (!source || source.type !== 'vortex') return [];
+    const orders = source.loadOrder || {};
+    const key = (profileKey && profileKey !== '__all__' && orders[profileKey])
+      ? profileKey
+      : defaultProfileFor(source, gameId);
+    const entries = orders[key];
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .filter(e => e && (e.name || e.id))
+      .map((e, i) => ({
+        position: i + 1,
+        name: String(e.name || e.id),
+        enabled: !!e.enabled,
+      }));
+  }
+
+  // Which games in this file have a load order at all. Used to explain the
+  // empty case: "Vortex didn't record one for this game, but it did for these".
+  function gamesWithLoadOrder(source){
+    if (!source || source.type !== 'vortex') return [];
+    return gamesWithMods(source)
+      .filter(g => loadOrderFor(source, g, '__all__').length > 0);
+  }
+
+  // What to say when the selected game has no load order. Naming the games
+  // that do is the difference between "this tool is broken" and "Vortex only
+  // records this for some games".
+  function loadOrderNote(gameId, gamesWithOrder){
+    const others = (gamesWithOrder || []).filter(g => g !== gameId);
+    const base = 'Vortex has no plugin load order for ' + (gameId || 'this game') +
+      '. It records one only for games whose extension provides it, which is ' +
+      'mostly the Bethesda titles — so this is a gap in what Vortex captured, ' +
+      'not something missing from the file you loaded.';
+    if (!others.length) return base;
+    const list = others.length === 1
+      ? others[0]
+      : others.slice(0, -1).join(', ') + ' and ' + others[others.length - 1];
+    return base + ' In this file it did record one for ' + list + '.';
+  }
+
   function statusLabel(enabled){
     return enabled === null || enabled === undefined ? '—' : (enabled ? 'enabled' : 'disabled');
   }
@@ -2444,7 +2593,27 @@
     });
   }
 
+  // "Post your load order" is the request this exists to answer, so the plain
+  // text form is the numbered list people are asked for, and nothing else.
+  function orderTextLines(){
+    return currentOrder.map(e =>
+      e.position + '. ' + e.name + (e.enabled ? '' : ' [disabled]'));
+  }
+
+  function orderMarkdownLines(){
+    return ['| # | Plugin | Status |', '| ---: | --- | --- |'].concat(
+      currentOrder.map(e => '| ' + e.position + ' | ' + mdCell(e.name) + ' | ' +
+        (e.enabled ? 'enabled' : 'disabled') + ' |'));
+  }
+
+  function orderBbcodeLines(){
+    return ['[list=1]'].concat(
+      currentOrder.map(e => '[*]' + bbSafe(e.name) + (e.enabled ? '' : ' (disabled)')),
+      ['[/list]']);
+  }
+
   function textLines(){
+    if (view === 'order') return orderTextLines();
     if (view === 'diff') return diffTextLines();
     const withOrder = exportHasOrder();
     return currentRows.map(r => {
@@ -2455,6 +2624,13 @@
   }
 
   csvBtn.addEventListener('click', () => {
+    if (view === 'order'){
+      const lines = ['#,Plugin,Status'];
+      currentOrder.forEach(e => lines.push(
+        [e.position, e.name, e.enabled ? 'enabled' : 'disabled'].map(csvCell).join(',')));
+      downloadCsv(exportName('.csv'), lines);
+      return;
+    }
     if (view === 'diff'){
       const lines = ['Change,Mod,Version,Status,Detail'];
       visibleDiff.forEach(d => {
@@ -2539,6 +2715,11 @@
   // itself, so only the two new formats branch on it here.
   function shareLines(){
     const fmt = shareFormat.value;
+    if (view === 'order'){
+      if (fmt === 'markdown') return orderMarkdownLines();
+      if (fmt === 'bbcode') return orderBbcodeLines();
+      return orderTextLines();
+    }
     const isDiff = view === 'diff';
     if (fmt === 'markdown') return isDiff ? markdownDiffLines(visibleDiff) : markdownLines(currentRows);
     if (fmt === 'bbcode') return isDiff ? bbcodeDiffLines(visibleDiff) : bbcodeLines(currentRows);
