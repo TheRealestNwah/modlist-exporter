@@ -54,6 +54,9 @@ install.
 
 - `index.html` — everything (markup, CSS, JS) lives in this one file.
 - `test/` — tests. Development only; nothing here is needed to use the tool.
+- `docs/` — the README screenshot and the social preview image. Neither is
+  loaded by the tool; `og.png` is only ever fetched by a crawler when someone
+  shares the link.
 
 ## Running it
 
