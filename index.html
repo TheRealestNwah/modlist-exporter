@@ -27,7 +27,23 @@
 <meta property="og:image:height" content="1260">
 <meta property="og:image:alt" content="The tool showing a Skyrim Special Edition mod list with versions, install sizes, endorsement status and export buttons.">
 <meta name="twitter:card" content="summary_large_image">
+<script data-theme-boot>
+  /* Runs before the body paints so a stored theme does not flash Midnight
+     first. Deliberately tiny, and deliberately carries an attribute: the test
+     harness lifts functions out of the unattributed script element at the end
+     of the file, and matches on the opening tag -- so this comment must not
+     spell that tag out either, or the match starts here. localStorage throws
+     rather than returning null in some privacy modes, hence the try. */
+  try {
+    var storedTheme = localStorage.getItem('modlist-theme');
+    if (storedTheme) document.documentElement.setAttribute('data-theme', storedTheme);
+  } catch (e) { /* no stored preference available; the default applies */ }
+</script>
 <style>
+  /* Midnight, the default. Every theme is this same token set with different
+     values, so a theme block below only has to restate what it changes.
+     The font stacks are system-only on purpose: the page loads no webfonts,
+     which is what lets it make no network requests at all. */
   :root{
     --bg: #16141c;
     --panel: #1e1b26;
@@ -39,8 +55,32 @@
     --accent-dim: #5c4a99;
     --good: #5fd68a;
     --bad: #ff6b6b;
-    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
-    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+    /* The wash behind a badge or a notice, and the edge a notice draws. */
+    --good-tint: rgba(95,214,138,0.15);
+    --good-edge: rgba(95,214,138,0.25);
+    --bad-tint: rgba(255,107,107,0.12);
+    --bad-edge: rgba(255,107,107,0.25);
+    --accent-tint: rgba(143,107,255,0.18);
+    --accent-ink: #b79bff;
+
+    /* Text that sits on a solid fill, which is not the same colour as text
+       on the page -- a light theme needs white here, a yellow one near-black. */
+    --on-accent: var(--ink);
+    --on-good: #12241a;
+
+    /* The sticky header needs to hide the rows passing under it. */
+    --thead-bg: var(--bg);
+
+    /* Shape. A theme can go square or go capsule by moving these. */
+    --r-control: 8px;
+    --r-btn: 7px;
+    --r-badge: 5px;
+    --r-panel: 10px;
+    --r-drop: 14px;
+
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
   * { box-sizing: border-box; }
   body{
@@ -73,7 +113,7 @@
     margin-top: 14px;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--r-panel);
     padding: 2px 16px;
   }
   details.help summary{
@@ -95,7 +135,7 @@
   .dropzone{
     margin-top: 22px;
     border: 1.5px dashed var(--line);
-    border-radius: 14px;
+    border-radius: var(--r-drop);
     background: var(--panel);
     padding: 34px 24px;
     text-align: center;
@@ -115,7 +155,7 @@
     margin-top: 22px;
     padding: 14px 16px;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--r-panel);
     background: var(--panel);
     font-size: 13.5px;
     line-height: 1.65;
@@ -129,7 +169,7 @@
   .freshness{
     margin-top: 10px;
     padding: 10px 14px;
-    border-radius: 8px;
+    border-radius: var(--r-panel);
     font-family: var(--mono);
     font-size: 12.5px;
     display: none;
@@ -137,8 +177,8 @@
     gap: 8px;
   }
   .freshness.show{ display: flex; }
-  .freshness.fresh{ background: rgba(95,214,138,0.1); color: var(--good); border: 1px solid rgba(95,214,138,0.25); }
-  .freshness.stale{ background: rgba(255,107,107,0.1); color: var(--bad); border: 1px solid rgba(255,107,107,0.25); }
+  .freshness.fresh{ background: var(--good-tint); color: var(--good); border: 1px solid var(--good-edge); }
+  .freshness.stale{ background: var(--bad-tint); color: var(--bad); border: 1px solid var(--bad-edge); }
 
   .controls{
     margin-top: 26px;
@@ -155,7 +195,7 @@
     border: 1px solid var(--line);
     color: var(--ink);
     padding: 9px 12px;
-    border-radius: 8px;
+    border-radius: var(--r-control);
     font-size: 13.5px;
     font-family: var(--sans);
     min-width: 200px;
@@ -184,10 +224,10 @@
   .export-btns select{ min-width: unset; padding: 7px 10px; font-size: 12.5px; }
   .export-btns button{
     background: var(--accent-dim);
-    color: var(--ink);
+    color: var(--on-accent);
     border: none;
     padding: 8px 13px;
-    border-radius: 7px;
+    border-radius: var(--r-btn);
     font-size: 12.5px;
     font-family: var(--sans);
     font-weight: 500;
@@ -195,7 +235,7 @@
     transition: background .15s ease;
   }
   .export-btns button:hover{ background: var(--accent); }
-  .export-btns button.copied{ background: var(--good); color: #12241a; }
+  .export-btns button.copied{ background: var(--good); color: var(--on-good); }
 
   table{
     margin-top: 14px;
@@ -215,7 +255,7 @@
     border-bottom: 1px solid var(--line);
     position: sticky;
     top: 0;
-    background: var(--bg);
+    background: var(--thead-bg);
   }
   tbody td{
     padding: 10px 12px;
@@ -229,14 +269,14 @@
     font-family: var(--mono);
     font-size: 11px;
     padding: 2px 7px;
-    border-radius: 5px;
+    border-radius: var(--r-badge);
     display: inline-block;
   }
-  .badge.on{ background: rgba(95,214,138,0.15); color: var(--good); }
-  .badge.off{ background: rgba(255,107,107,0.12); color: var(--bad); }
-  .badge.added{ background: rgba(95,214,138,0.15); color: var(--good); }
-  .badge.removed{ background: rgba(255,107,107,0.12); color: var(--bad); }
-  .badge.changed{ background: rgba(143,107,255,0.18); color: #b79bff; }
+  .badge.on{ background: var(--good-tint); color: var(--good); }
+  .badge.off{ background: var(--bad-tint); color: var(--bad); }
+  .badge.added{ background: var(--good-tint); color: var(--good); }
+  .badge.removed{ background: var(--bad-tint); color: var(--bad); }
+  .badge.changed{ background: var(--accent-tint); color: var(--accent-ink); }
   .badge.unchanged{ background: var(--panel-2); color: var(--ink-dim); }
 
   /* --- comparison --- */
@@ -251,13 +291,13 @@
     color: var(--ink-dim);
     border: 1px solid var(--line);
     padding: 7px 14px;
-    border-radius: 8px;
+    border-radius: var(--r-control);
     font-size: 12.5px;
     font-family: var(--sans);
     cursor: pointer;
     transition: background .15s ease, color .15s ease;
   }
-  .view-tabs button.active{ background: var(--accent-dim); color: var(--ink); border-color: var(--accent-dim); }
+  .view-tabs button.active{ background: var(--accent-dim); color: var(--on-accent); border-color: var(--accent-dim); }
   .diff-filters{ display:none; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .diff-filters.show{ display:flex; }
   .diff-filters .toggle-btn{ padding: 7px 11px; font-size: 12.5px; }
@@ -287,7 +327,7 @@
     margin-top: 18px;
     padding: 12px 14px;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--r-panel);
     background: var(--panel);
     font-family: var(--mono);
     font-size: 12.5px;
@@ -305,7 +345,7 @@
     border: 1px solid var(--line);
     color: var(--ink);
     padding: 9px 12px;
-    border-radius: 8px;
+    border-radius: var(--r-control);
     font-size: 13.5px;
     font-family: var(--sans);
     min-width: 220px;
@@ -328,6 +368,183 @@
     display: none;
   }
   .empty-note.show{ display:block; }
+
+  /* --- Nexus -------------------------------------------------------------
+     Near-black cool charcoal with amber calls to action. The recognisable
+     part is the solid amber fill with a near-black label, which is what a
+     primary action looks like on the site; --on-accent carries that. */
+  [data-theme="nexus"]{
+    --bg: #101114;
+    --panel: #191b1f;
+    --panel-2: #22252a;
+    --line: #31353c;
+    --ink: #e6e8ea;
+    --ink-dim: #969ba3;
+    --accent: #e8a317;
+    --accent-dim: #e8a317;
+    --good: #4fb06a;
+    --bad: #e5484d;
+    --good-tint: rgba(79,176,106,0.16);
+    --good-edge: rgba(79,176,106,0.25);
+    --bad-tint: rgba(229,72,77,0.14);
+    --bad-edge: rgba(229,72,77,0.25);
+    --accent-tint: rgba(232,163,23,0.18);
+    --accent-ink: var(--accent);
+    --on-accent: #17181a;
+    --on-good: #0d1a11;
+    --r-control: 5px;
+    --r-btn: 5px;
+    --r-badge: 3px;
+    --r-panel: 5px;
+    --r-drop: 8px;
+  }
+  /* A solid amber button carries its label at a heavier weight than a tinted
+     one needs, or the near-black text reads thin against it. */
+  [data-theme="nexus"] .export-btns button,
+  [data-theme="nexus"] .view-tabs button.active{ font-weight: 600; }
+  [data-theme="nexus"] .export-btns button:hover{ background: #f7b52e; }
+
+  /* --- Liquid Glass ------------------------------------------------------
+     Translucent material over a lit background, rather than flat fills. Three
+     things make it work: something worth refracting behind the glass, a bright
+     inner edge along the top of each surface, and capsule geometry.
+
+     The panel tokens are deliberately semi-transparent -- every surface that
+     should read as glass takes its background from --panel or --panel-2 and
+     gets the blur from the rule below. */
+  [data-theme="glass"]{
+    color-scheme: light;
+    --bg: #eef1f7;
+    --panel: rgba(255,255,255,0.55);
+    --panel-2: rgba(255,255,255,0.72);
+    --line: rgba(255,255,255,0.70);
+    --ink: #16181d;
+    --ink-dim: #5b6472;
+    --accent: #0071e3;
+    --accent-dim: rgba(0,113,227,0.88);
+    --good: #1a7f3c;
+    --bad: #c11627;
+    --good-tint: rgba(26,127,60,0.14);
+    --good-edge: rgba(26,127,60,0.30);
+    --bad-tint: rgba(193,22,39,0.11);
+    --bad-edge: rgba(193,22,39,0.26);
+    --accent-tint: rgba(0,113,227,0.14);
+    --accent-ink: #0062c4;
+    --on-accent: #ffffff;
+    --on-good: #ffffff;
+    --thead-bg: rgba(255,255,255,0.72);
+    --r-control: 999px;
+    --r-btn: 999px;
+    --r-badge: 999px;
+    --r-panel: 18px;
+    --r-drop: 22px;
+    --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    --glass: saturate(180%) blur(24px);
+    --glass-edge: inset 0 1px 0 rgba(255,255,255,0.85);
+    --glass-lift: 0 8px 30px rgba(20,32,66,0.10);
+  }
+  /* Glass with nothing behind it is just a grey box, so the page gets a lit
+     ground for the surfaces to pick up. Fixed, so it does not slide under the
+     content while scrolling a long list. */
+  [data-theme="glass"] body{
+    background:
+      radial-gradient(1100px 620px at 12% -8%, rgba(110,160,255,0.40), transparent 62%),
+      radial-gradient(900px 520px at 92% -2%, rgba(255,140,190,0.26), transparent 58%),
+      radial-gradient(820px 700px at 65% 108%, rgba(90,225,215,0.26), transparent 62%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  [data-theme="glass"] .dropzone,
+  [data-theme="glass"] details.help,
+  [data-theme="glass"] .missing-note,
+  [data-theme="glass"] .noscript,
+  [data-theme="glass"] .freshness,
+  [data-theme="glass"] select,
+  [data-theme="glass"] #searchInput,
+  [data-theme="glass"] .toggle-btn,
+  [data-theme="glass"] .view-tabs button,
+  [data-theme="glass"] thead th{
+    -webkit-backdrop-filter: var(--glass);
+    backdrop-filter: var(--glass);
+    box-shadow: var(--glass-edge);
+  }
+  /* The table sits on its own pane so rows stay legible over the gradient.
+     :has keeps the pane from appearing as an empty rectangle before a file is
+     loaded, since the table itself is display:none until then. */
+  [data-theme="glass"] .table-scroll:has(table.show){
+    background: var(--panel);
+    -webkit-backdrop-filter: var(--glass);
+    backdrop-filter: var(--glass);
+    border-radius: var(--r-panel);
+    box-shadow: var(--glass-edge), var(--glass-lift);
+    padding: 4px 16px 8px;
+    margin-top: 10px;
+  }
+  [data-theme="glass"] .dropzone{ box-shadow: var(--glass-edge), var(--glass-lift); }
+  [data-theme="glass"] .dropzone,
+  [data-theme="glass"] select,
+  [data-theme="glass"] #searchInput,
+  [data-theme="glass"] .toggle-btn{ border-color: rgba(255,255,255,0.75); }
+  [data-theme="glass"] h1{ letter-spacing: -0.02em; }
+  [data-theme="glass"] tbody td,
+  [data-theme="glass"] thead th{ border-bottom-color: rgba(20,32,66,0.10); }
+  [data-theme="glass"] tbody tr:hover{ background: rgba(255,255,255,0.45); }
+  /* A tinted capsule that still refracts, with the light catching its top. */
+  [data-theme="glass"] .export-btns button{
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px rgba(0,113,227,0.26);
+  }
+  [data-theme="glass"] .export-btns button:hover{ background: rgba(0,113,227,0.98); }
+
+  /* Transparency is a preference, not a given: macOS and iOS both expose a
+     Reduce Transparency switch, and this is the same request. Fall back to
+     opaque surfaces on a plain ground rather than thinning the blur. */
+  @media (prefers-reduced-transparency: reduce){
+    [data-theme="glass"]{
+      --panel: #ffffff;
+      --panel-2: #f2f4f8;
+      --line: #d4d9e2;
+      --thead-bg: #ffffff;
+      --glass: none;
+      --glass-lift: 0 1px 2px rgba(20,32,66,0.10);
+    }
+    [data-theme="glass"] body{ background: var(--bg); }
+  }
+  /* Same fallback where the browser cannot blur at all, or the panels would
+     render as flat washes of near-white with no separation. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+    [data-theme="glass"]{
+      --panel: #ffffff;
+      --panel-2: #f2f4f8;
+      --line: #d4d9e2;
+      --thead-bg: #ffffff;
+    }
+    [data-theme="glass"] body{ background: var(--bg); }
+  }
+
+  /* The picker itself, sitting opposite the eyebrow. */
+  .header-top{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .theme-pick{ display: flex; align-items: center; gap: 7px; }
+  .theme-pick label{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-dim);
+  }
+  .theme-pick select{
+    min-width: 0;
+    padding: 5px 9px;
+    font-size: 12px;
+    border-radius: var(--r-control);
+  }
 
   /* --- narrow screens ---------------------------------------------------
      Without this the page has no viewport of its own, so a phone lays it out
@@ -376,7 +593,17 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="eyebrow">local · read-only · nothing leaves your browser</div>
+    <div class="header-top">
+      <div class="eyebrow">local · read-only · nothing leaves your browser</div>
+      <div class="theme-pick">
+        <label for="themeSelect">Theme</label>
+        <select id="themeSelect">
+          <option value="midnight">Midnight</option>
+          <option value="nexus">Nexus</option>
+          <option value="glass">Liquid Glass</option>
+        </select>
+      </div>
+    </div>
     <h1>Modlist Exporter</h1>
     <div class="sub">Drop in a Vortex state file or a Mod Organizer 2 modlist.txt and get a clean, exportable list of your mods — name, version, and enabled status where the format provides it. The file is parsed entirely in your browser; it's never uploaded anywhere.</div>
     <details class="help">
@@ -541,6 +768,7 @@
   const csvBtn = document.getElementById('csvBtn');
   const txtBtn = document.getElementById('txtBtn');
   const shareFormat = document.getElementById('shareFormat');
+  const themeSelect = document.getElementById('themeSelect');
   const sortSelect = document.getElementById('sortSelect');
   const sortField = document.getElementById('sortField');
   const compareWrap = document.getElementById('compareWrap');
@@ -601,6 +829,45 @@
   fileInput.addEventListener('change', e => {
     if (e.target.files.length) handleFile(e.target.files[0]);
   });
+
+  // The themes the picker offers, in the order it offers them. Inlined in a
+  // function rather than held in a shared const so the test harness, which
+  // lifts these out one at a time, does not need the surrounding scope.
+  function themeIds(){
+    return ['midnight', 'nexus', 'glass'];
+  }
+
+  // Anything unrecognised falls back to the default rather than leaving the
+  // page with a data-theme that matches no block: what comes out of storage is
+  // whatever was last written there, including by an older version of this file.
+  function resolveTheme(value){
+    const id = String(value === null || value === undefined ? '' : value);
+    return themeIds().indexOf(id) === -1 ? 'midnight' : id;
+  }
+
+  // Native controls and the mobile browser chrome follow these two meta tags
+  // rather than any of our variables, so they have to move with the theme --
+  // otherwise an unchecked box on the light theme paints as a dark square.
+  function themeMeta(theme){
+    const id = resolveTheme(theme);
+    if (id === 'nexus') return { colorScheme: 'dark', themeColor: '#101114' };
+    if (id === 'glass') return { colorScheme: 'light', themeColor: '#eef1f7' };
+    return { colorScheme: 'dark', themeColor: '#16141c' };
+  }
+
+  function applyTheme(value){
+    const id = resolveTheme(value);
+    document.documentElement.setAttribute('data-theme', id);
+    const meta = themeMeta(id);
+    document.querySelector('meta[name="color-scheme"]').setAttribute('content', meta.colorScheme);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', meta.themeColor);
+    if (themeSelect.value !== id) themeSelect.value = id;
+    try{ localStorage.setItem('modlist-theme', id); }catch(e){ /* nothing to persist to */ }
+  }
+
+  themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
+  // The boot script may already have set this from storage; normalise it.
+  applyTheme(document.documentElement.getAttribute('data-theme'));
 
   function setStatus(msg, cls){
     statusEl.textContent = msg;

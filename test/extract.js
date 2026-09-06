@@ -44,17 +44,31 @@ const NAMES = [
   'bbcodeLines',
   'markdownDiffLines',
   'bbcodeDiffLines',
+  'themeIds',
+  'resolveTheme',
+  'themeMeta',
 ];
 
 function extract() {
   const html = fs.readFileSync(INDEX, 'utf8');
-  const script = html.match(/<script>([\s\S]*?)<\/script>/);
-  if (!script) {
-    throw new Error('No <script> block found in index.html');
+
+  // index.html has more than one script element -- there is a small one in the
+  // head that applies the stored theme before first paint. Pick the block by
+  // what is in it rather than by position, so adding another one cannot
+  // silently point this at the wrong code. (Matching on the opening tag alone
+  // is worse than it looks: the tag spelled out inside a comment matches too.)
+  const blocks = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1])
+    .filter((body) => body.includes('function parseModlist('));
+  if (blocks.length !== 1) {
+    throw new Error(
+      'Expected exactly one script block in index.html defining parseModlist(), found ' +
+      blocks.length + '. If the file was restructured, update test/extract.js.'
+    );
   }
   // Git's autocrlf means this file is CRLF on a Windows checkout and LF on
   // Linux CI. Normalise so the extraction markers match in both places.
-  const js = script[1].replace(/\r\n/g, '\n');
+  const js = blocks[0].replace(/\r\n/g, '\n');
 
   const parts = NAMES.map((name) => {
     const open = '  function ' + name + '(';
