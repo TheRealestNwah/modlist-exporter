@@ -8,7 +8,8 @@ const path = require('node:path');
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
         collectionMembership, collectionLabel, viewState,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
-        defaultProfileFor, gamesWithMods, allGamesRows, allGamesFileName,
+        defaultProfileFor, gamesWithMods, allGamesRows,
+        installedAt, installedLabel, nexusPageCounts, allGamesFileName,
         columnsIn, csvStatus, statusLabel,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
@@ -603,12 +604,105 @@ test('viewState: hasEndo reflects whether any endorsement data exists', () => {
   assert.strictEqual(viewState([V('A')], {}).hasEndo, false);
 });
 
+// ------------------------------------------------------------ install date
+
+test('installedAt: parses the ISO string Vortex writes', () => {
+  assert.strictEqual(installedAt('2024-03-20T01:06:42.075Z'), Date.parse('2024-03-20T01:06:42.075Z'));
+});
+
+test('installedAt: anything unparseable is null, not NaN or 0', () => {
+  // A NaN would sort unpredictably; a 0 would claim the mod was installed in 1970.
+  for (const bad of [undefined, null, '', 'not a date', 42, {}]) {
+    assert.strictEqual(installedAt(bad), null, 'failed for ' + String(bad));
+  }
+});
+
+test('installedLabel: shows the date only', () => {
+  const ms = new Date(2024, 2, 20, 13, 45).getTime();
+  assert.strictEqual(installedLabel(ms), '2024-03-20');
+});
+
+test('installedLabel: pads single-digit months and days', () => {
+  assert.strictEqual(installedLabel(new Date(2025, 0, 5).getTime()), '2025-01-05');
+});
+
+test('installedLabel: no date renders as a dash', () => {
+  for (const bad of [null, undefined, NaN, Infinity, '2024-01-01']) {
+    assert.strictEqual(installedLabel(bad), '—', 'failed for ' + String(bad));
+  }
+});
+
+test('viewState: sorts newest installed first, undated last', () => {
+  const rows = [
+    V('old', { installed: Date.parse('2024-01-01') }),
+    V('new', { installed: Date.parse('2026-01-01') }),
+    V('never'),
+  ];
+  assert.deepStrictEqual(
+    viewState(rows, { sort: 'installed' }).rows.map((r) => r.modId),
+    ['new', 'old', 'never']);
+});
+
+test('viewState: the installed sort falls back when nothing has a date', () => {
+  const v = viewState([V('A'), V('B')], { sort: 'installed' });
+  assert.strictEqual(v.sort, 'name');
+  assert.strictEqual(v.hasWhen, false);
+});
+
+// ------------------------------------------------------ same Nexus page
+
+test('nexusPageCounts: several files from one page all report the group size', () => {
+  // Normal: a mod page ships a main file plus optional patches.
+  const counts = nexusPageCounts({
+    a: { attributes: { source: 'nexus', modId: 75851 } },
+    b: { attributes: { source: 'nexus', modId: 75851 } },
+    c: { attributes: { source: 'nexus', modId: 999 } },
+  });
+  assert.strictEqual(counts.get('a'), 2);
+  assert.strictEqual(counts.get('b'), 2);
+  assert.strictEqual(counts.get('c'), 1);
+});
+
+test('nexusPageCounts: a numeric and string modId are the same page', () => {
+  const counts = nexusPageCounts({
+    a: { attributes: { source: 'nexus', modId: 12 } },
+    b: { attributes: { source: 'nexus', modId: '12' } },
+  });
+  assert.strictEqual(counts.get('a'), 2);
+});
+
+test('nexusPageCounts: non-Nexus mods are not counted at all', () => {
+  const counts = nexusPageCounts({
+    local1: { attributes: { name: 'Merged Patch' } },
+    local2: { attributes: { name: 'Another' } },
+  });
+  assert.strictEqual(counts.size, 0);
+});
+
+test('nexusPageCounts: a nexus mod with no modId is not grouped', () => {
+  assert.strictEqual(nexusPageCounts({ a: { attributes: { source: 'nexus' } } }).size, 0);
+});
+
+test('buildRows: carries the install date and the page group size', () => {
+  const rows = buildRows(vortex({
+    a: { attributes: { name: 'A', source: 'nexus', modId: 5, installTime: '2025-06-01T10:00:00Z' } },
+    b: { attributes: { name: 'B', source: 'nexus', modId: 5 } },
+    c: { attributes: { name: 'C' } },
+  }), 'skyrimse', '__all__');
+  const by = Object.fromEntries(rows.map((r) => [r.name, r]));
+  assert.strictEqual(by.A.installed, Date.parse('2025-06-01T10:00:00Z'));
+  assert.strictEqual(by.B.installed, null);
+  assert.strictEqual(by.A.pageSiblings, 2, 'A and B share a page');
+  assert.strictEqual(by.C.pageSiblings, 0, 'a local mod has no page');
+});
+
 // --------------------------------------------- column presence / csv status
 
 test('columnsIn: reports only the columns the rows actually carry', () => {
   // An MO2 row set: an order, and nothing else optional.
   const mo2 = [{ name: 'A', order: 1 }];
-  assert.deepStrictEqual(columnsIn(mo2), { order: true, size: false, coll: false, endo: false });
+  assert.deepStrictEqual(columnsIn(mo2),
+    { order: true, size: false, coll: false, endo: false, when: false });
 });
 
 test('columnsIn: one row carrying a field is enough to show the column', () => {
@@ -623,7 +717,7 @@ test('columnsIn: an endorsement decision of any kind counts, including Abstained
 });
 
 test('columnsIn: an empty or missing row set carries no columns', () => {
-  const none = { order: false, size: false, coll: false, endo: false };
+  const none = { order: false, size: false, coll: false, endo: false, when: false };
   assert.deepStrictEqual(columnsIn([]), none);
   assert.deepStrictEqual(columnsIn(null), none);
 });
@@ -636,7 +730,8 @@ test('columnsIn: the view and the exports agree about the same rows', () => {
   const view = viewState(rows, {});
   const cols = columnsIn(rows);
   assert.deepStrictEqual(
-    { order: view.hasOrder, size: view.hasSize, coll: view.hasColl, endo: view.hasEndo },
+    { order: view.hasOrder, size: view.hasSize, coll: view.hasColl, endo: view.hasEndo,
+      when: view.hasWhen },
     cols);
 });
 
