@@ -128,23 +128,6 @@ committed.
 
 Tests run in CI on every pull request into `main`.
 
-## Releasing
-
-`main` holds finished work that hasn't shipped yet — pushing to it does not
-change the live site. The GitHub Pages deploy runs only when a release is
-**published** on GitHub, and it deploys the commit that release's tag points
-at.
-
-So the flow is: merge to `main` freely, then publish a release when you want
-those changes live. Pushing a bare tag isn't enough — the release itself has
-to be published. There's a manual "Run workflow" button on the Actions tab if
-you ever need to redeploy without cutting a release.
-
-Repository configuration for the `github-pages` environment — a nasty gotcha
-around deploying from a tag rather than a branch — is covered separately in
-[`docs/deploying.md`](docs/deploying.md), since it's about administering this
-repo rather than about the tool itself.
-
 ## How it works
 
 The tool detects the format automatically based on file content, not
@@ -442,6 +425,10 @@ tried by just opening `index.html` in a browser after editing.
 Please run the tests as well — `node --test test/*.test.js`, no install
 needed. They also run automatically on every pull request, and `main`
 requires them to pass.
+
+Merging to `main` doesn't put anything live — the site only deploys when a
+release is published. See [`docs/deploying.md`](docs/deploying.md) for that
+flow and a GitHub Pages environment gotcha worth knowing before you cut one.
 
 ## License
 
