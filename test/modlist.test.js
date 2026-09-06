@@ -8,7 +8,9 @@ const path = require('node:path');
 const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
         collectionMembership, collectionLabel, viewState,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
-        defaultProfileFor, gamesWithMods, allGamesRows } = require('./extract.js');
+        defaultProfileFor, gamesWithMods, allGamesRows,
+        mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
+        markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines } = require('./extract.js');
 
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
@@ -665,6 +667,215 @@ test('allGamesRows: an MO2 file exports nothing here', () => {
 test('allGamesRows: no games means no rows rather than a throw', () => {
   assert.deepStrictEqual(allGamesRows(multi({}), {}), []);
   assert.deepStrictEqual(allGamesRows(null, {}), []);
+});
+
+// ------------------------------------------------- markdown / bbcode export
+
+// Both formats are pasted somewhere that renders them, so the escaping tests
+// matter more than the layout ones: a mod name is written by a mod author.
+
+test('mdCell: a pipe cannot end the cell', () => {
+  assert.strictEqual(mdCell('Widescreen | 21:9'), 'Widescreen \\| 21:9');
+});
+
+test('mdCell: markdown syntax characters are escaped, not dropped', () => {
+  assert.strictEqual(mdCell('*A* _B_ `C` [D]'), '\\*A\\* \\_B\\_ \\`C\\` \\[D\\]');
+});
+
+test('mdCell: a < becomes an entity, since markdown passes raw HTML through', () => {
+  // Only the opening angle bracket has to go: nothing can start a tag without
+  // one, and a surviving > keeps "1.0 -> 2.0" readable in the raw text.
+  assert.strictEqual(mdCell('<img src=x onerror=y>'), '&lt;img src=x onerror=y>');
+  assert.strictEqual(mdCell('version 1.0 -> 2.0'), 'version 1.0 -> 2.0');
+});
+
+test('mdCell: an existing backslash is escaped before the escapes are added', () => {
+  // Otherwise a name ending in a backslash would escape our own separator.
+  assert.strictEqual(mdCell('Data\\'), 'Data\\\\');
+  assert.strictEqual(mdCell('a\\|b'), 'a\\\\\\|b');
+});
+
+test('mdCell: a newline in a name cannot break the row', () => {
+  assert.strictEqual(mdCell('Two\nLines'), 'Two Lines');
+  assert.strictEqual(mdCell('Two\r\n  Lines'), 'Two Lines');
+});
+
+test('mdCell: an ordinary name is left alone', () => {
+  assert.strictEqual(mdCell('SkyUI 5.2 SE'), 'SkyUI 5.2 SE');
+});
+
+test('mdCell: nothing at all is an empty cell, not "undefined"', () => {
+  assert.strictEqual(mdCell(undefined), '');
+  assert.strictEqual(mdCell(null), '');
+});
+
+test('bbSafe: brackets become parentheses so a name cannot open a tag', () => {
+  assert.strictEqual(bbSafe('Skyrim [SE]'), 'Skyrim (SE)');
+  assert.strictEqual(bbSafe('[url=http://evil]x[/url]'), '(url=http://evil)x(/url)');
+});
+
+test('bbSafe: a newline in a name cannot break the list item', () => {
+  assert.strictEqual(bbSafe('Two\nLines'), 'Two Lines');
+});
+
+test('bbSafe: an ordinary name is left alone', () => {
+  assert.strictEqual(bbSafe('SkyUI 5.2 SE'), 'SkyUI 5.2 SE');
+});
+
+test('safeHttpUrl: a real Nexus link passes', () => {
+  const u = 'https://www.nexusmods.com/skyrimspecialedition/mods/12604';
+  assert.strictEqual(safeHttpUrl(u), u);
+});
+
+test('safeHttpUrl: anything that could break out of the link syntax is refused', () => {
+  ['http://www.nexusmods.com/x', 'javascript:alert(1)', 'https://a b.com',
+   'https://x.com/a)b', 'https://x.com/a]b', 'https://x.com/a"b', "https://x.com/a'b",
+   '', null, undefined].forEach((bad) => {
+    assert.strictEqual(safeHttpUrl(bad), null, String(bad) + ' should be refused');
+  });
+});
+
+test('mdLink / bbLink: a link is built only when there is a safe URL', () => {
+  const u = 'https://www.nexusmods.com/skyrim/mods/1';
+  assert.strictEqual(mdLink('SkyUI', u), '[SkyUI](' + u + ')');
+  assert.strictEqual(bbLink('SkyUI', u), '[url=' + u + ']SkyUI[/url]');
+  assert.strictEqual(mdLink('SkyUI', null), 'SkyUI');
+  assert.strictEqual(bbLink('SkyUI', null), 'SkyUI');
+  assert.strictEqual(mdLink('SkyUI', 'javascript:alert(1)'), 'SkyUI');
+  assert.strictEqual(bbLink('SkyUI', 'javascript:alert(1)'), 'SkyUI');
+});
+
+test('mdLink / bbLink: the name is still escaped inside the link', () => {
+  const u = 'https://www.nexusmods.com/skyrim/mods/1';
+  assert.strictEqual(mdLink('A]B', u), '[A\\]B](' + u + ')');
+  assert.strictEqual(bbLink('A]B', u), '[url=' + u + ']A)B[/url]');
+});
+
+test('markdownLines: nothing to export is no table at all', () => {
+  assert.deepStrictEqual(markdownLines([]), []);
+  assert.deepStrictEqual(markdownLines(null), []);
+});
+
+test('markdownLines: columns appear only where the data does', () => {
+  assert.deepStrictEqual(markdownLines([V('A')]), [
+    '| Mod | Version | Status |',
+    '| --- | --- | --- |',
+    '| A | 1.0 | enabled |',
+  ]);
+});
+
+test('markdownLines: size, collection and endorsement columns show up when present', () => {
+  const rows = [V('A', { size: 47185920, collectionText: 'CET+Essentials', endorsed: 'Endorsed' })];
+  assert.deepStrictEqual(markdownLines(rows), [
+    '| Mod | Version | Size | From collection | Endorsed | Status |',
+    '| --- | --- | --: | --- | --- | --- |',
+    '| A | 1.0 | 45.0 MB | CET+Essentials | yes | enabled |',
+  ]);
+});
+
+test('markdownLines: the # column carries each row own order, not its position', () => {
+  // The table can be sorted by name while still holding MO2 priority numbers.
+  // Writing the position instead would silently renumber the load order.
+  const out = markdownLines([V('Alpha', { order: 9 }), V('Zeta', { order: 1 })]);
+  assert.strictEqual(out[0], '| # | Mod | Version | Status |');
+  assert.strictEqual(out[2], '| 9 | Alpha | 1.0 | enabled |');
+  assert.strictEqual(out[3], '| 1 | Zeta | 1.0 | enabled |');
+});
+
+test('markdownLines: a pipe in a mod name does not add a column', () => {
+  const out = markdownLines([V('Widescreen | 21:9', { name: 'Widescreen | 21:9' })]);
+  // Split on separators markdown would actually honour: an escaped pipe is not one.
+  const cells = (line) => line.split(/(?<!\\)\|/).length;
+  assert.strictEqual(cells(out[2]), cells(out[0]));
+});
+
+test('markdownLines: the mod name links to its source when there is one', () => {
+  const u = 'https://www.nexusmods.com/skyrim/mods/1';
+  const out = markdownLines([V('SkyUI', { sourceUrl: u })]);
+  assert.strictEqual(out[2], '| [SkyUI](' + u + ') | 1.0 | enabled |');
+});
+
+test('markdownLines: unknown status renders as a dash rather than a blank', () => {
+  assert.strictEqual(markdownLines([V('A', { enabled: null })])[2], '| A | 1.0 | — |');
+});
+
+test('bbcodeLines: nothing to export is no list at all', () => {
+  assert.deepStrictEqual(bbcodeLines([]), []);
+  assert.deepStrictEqual(bbcodeLines(null), []);
+});
+
+test('bbcodeLines: a plain list, with status in parentheses', () => {
+  assert.deepStrictEqual(bbcodeLines([V('A'), V('B', { enabled: false })]), [
+    '[list]',
+    '[*]A — 1.0 (enabled)',
+    '[*]B — 1.0 (disabled)',
+    '[/list]',
+  ]);
+});
+
+test('bbcodeLines: the position is written out, not left to list auto-numbering', () => {
+  // [list=1] would number by table order, which is not the priority order
+  // once the table is sorted by name.
+  assert.deepStrictEqual(bbcodeLines([V('Alpha', { order: 9 }), V('Zeta', { order: 1 })]), [
+    '[list]',
+    '[*]9. Alpha — 1.0 (enabled)',
+    '[*]1. Zeta — 1.0 (enabled)',
+    '[/list]',
+  ]);
+});
+
+test('bbcodeLines: an unknown status is left off rather than shown as a dash', () => {
+  assert.strictEqual(bbcodeLines([V('A', { enabled: null })])[1], '[*]A — 1.0');
+});
+
+test('bbcodeLines: a missing version is left off, and a size is included', () => {
+  assert.strictEqual(bbcodeLines([V('A', { version: '—', size: 47185920 })])[1],
+    '[*]A — 45.0 MB (enabled)');
+});
+
+test('bbcodeLines: a bracketed mod name cannot open a tag', () => {
+  const out = bbcodeLines([V('x', { name: 'Skyrim [SE] Patch' })]);
+  assert.strictEqual(out[1], '[*]Skyrim (SE) Patch — 1.0 (enabled)');
+});
+
+const D = (change, row, changes) => ({ change, row, changes });
+
+test('markdownDiffLines / bbcodeDiffLines: an empty diff exports nothing', () => {
+  assert.deepStrictEqual(markdownDiffLines([]), []);
+  assert.deepStrictEqual(bbcodeDiffLines(null), []);
+});
+
+test('markdownDiffLines: what changed lands in the detail column', () => {
+  const diffs = [
+    D('added', V('A')),
+    D('changed', V('B'), [{ field: 'version', from: '1.0', to: '2.0' }]),
+  ];
+  assert.deepStrictEqual(markdownDiffLines(diffs), [
+    '| Change | Mod | Version | Status | Detail |',
+    '| --- | --- | --- | --- | --- |',
+    '| added | A | 1.0 | enabled |  |',
+    '| changed | B | 1.0 | enabled | version 1.0 -> 2.0 |',
+  ]);
+});
+
+test('bbcodeDiffLines: the change type is bolded, the detail follows the name', () => {
+  const diffs = [
+    D('added', V('A')),
+    D('changed', V('B'), [{ field: 'version', from: '1.0', to: '2.0' }]),
+  ];
+  assert.deepStrictEqual(bbcodeDiffLines(diffs), [
+    '[list]',
+    '[*][b]added[/b] A — enabled',
+    '[*][b]changed[/b] B — version 1.0 -> 2.0',
+    '[/list]',
+  ]);
+});
+
+test('diff exports escape a hostile name in both formats', () => {
+  const md = markdownDiffLines([D('added', V('x', { name: 'A|B' }))]);
+  assert.ok(md[2].indexOf('A\\|B') !== -1, md[2]);
+  const bb = bbcodeDiffLines([D('added', V('x', { name: '[b]A[/b]' }))]);
+  assert.strictEqual(bb[1], '[*][b]added[/b] (b)A(/b) — enabled');
 });
 
 // -------------------------------------------------- optional: real backups

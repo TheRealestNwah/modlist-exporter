@@ -34,6 +34,16 @@ const NAMES = [
   'defaultProfileFor',
   'gamesWithMods',
   'allGamesRows',
+  'diffDetail',
+  'mdCell',
+  'bbSafe',
+  'safeHttpUrl',
+  'mdLink',
+  'bbLink',
+  'markdownLines',
+  'bbcodeLines',
+  'markdownDiffLines',
+  'bbcodeDiffLines',
 ];
 
 function extract() {
