@@ -105,9 +105,15 @@ functions it lifts:
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `themeIds`,
 `resolveTheme` and `themeMeta`.
 
-That list is maintained by hand. Adding a helper that existing functions call,
-without adding it here, breaks a lot of tests at once — which is loud, but
-worth knowing about before it happens.
+That list is maintained by hand, and forgetting to add a newly extracted
+helper to it broke the suite three separate times — each time as a wall of
+`ReferenceError`s across dozens of tests, saying nothing about the cause.
+
+`extract.js` now checks for that before evaluating anything: if the extracted
+code calls a function `index.html` declares at the top level of its IIFE, and
+that function isn't in the list, extraction stops with one message naming it.
+Comments are stripped first, so a function mentioned in prose doesn't count as
+a call.
 
 That couples the tests to the file's shape — each of those must stay declared
 at two-space indentation inside the IIFE. If one is renamed or re-indented,
