@@ -8,7 +8,7 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
 
 **[Live demo](https://therealestnwah.github.io/modlist-exporter/)**
 
-![The mod list view in the Midnight theme: a Skyrim Special Edition profile of ten mods, showing the theme picker, search and sort controls, per-mod install sizes with a 2.8 GB disk total, install dates, collection membership, endorsement status, enabled status, links out to Nexus, and a note that one mod listed by a collection is not installed](docs/screenshot.png)
+![The mod list view in the Midnight theme: a Metal Gear Solid 3 profile of twelve mods totalling 5.2 GB, with the Mod list and Load order tabs above the table, and columns for version, install size, install date, which collection each mod came from, endorsement status and enabled status, links out to Nexus alongside a count of other mods from the same page, and a note below listing two mods a collection expects that are not installed](docs/screenshot.png)
 
 <sub>Example data — not a real load order.</sub>
 
@@ -66,8 +66,8 @@ install.
 
 - `index.html` — everything (markup, CSS, JS) lives in this one file.
 - `test/` — tests. Development only; nothing here is needed to use the tool.
-- `docs/` — the README screenshot, the social preview image, and a note on
-  deploying. None of it is loaded by the tool; `og.png` is only ever fetched
+- `docs/` — the two README screenshots, the social preview image, and a note
+  on deploying. None of it is loaded by the tool; `og.png` is only ever fetched
   by a crawler when someone shares the link.
 
 ## Browser support
@@ -438,6 +438,8 @@ load order for the selected Vortex game and profile. The tabs appear as soon
 as there is somewhere to go: a Vortex file offers Load order on its own, and
 Changes appears once a second file is loaded to compare against. An MO2
 `modlist.txt` has no plugins in it, so it offers no load order tab at all.
+
+![The load order view in the Midnight theme: thirty-five Morrowind plugins numbered from one downwards in the order the game loads them, each row showing the plugin filename and an enabled or disabled badge, with the plain text, CSV and .txt export controls above the table](docs/load-order.png)
 
 **What it is for.** "Post your load order" is the first thing asked in almost
 any modding support thread, because plugin order decides which mod's changes
