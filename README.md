@@ -271,7 +271,7 @@ changes, and matching noise there would be worse than the signal.
 
 ## Themes
 
-Seven, picked from the header and remembered in `localStorage` per browser:
+Eight, picked from the header and remembered in `localStorage` per browser:
 
 - **Midnight** — the default. Dark, violet accent.
 - **Vortex** — near-black with amber calls to action, in the spirit of the
@@ -293,29 +293,38 @@ Seven, picked from the header and remembered in `localStorage` per browser:
   PHP templating with no colours in it, so a screenshot was the only way
   to get this right after two earlier, unverified guesses (plain
   Wikipedia grey-and-blue, then an invented navy palette) both missed.
-- **Fallout 3 terminal** — a monochrome CRT readout: green phosphor on
+- **Terminal Green** — a monochrome CRT readout: green phosphor on
   black, square corners, a scanline-and-vignette overlay, and every
   clickable thing in brackets the way a terminal menu option reads as
   `[ CONTINUE ]`. Chrome — headings, table headers, buttons, badges — is
   set in caps; the mod list itself stays as typed, since a long list set
   entirely in capitals is real data made harder to scan, not more
   authentic.
-- **New Vegas terminal** — the same terminal, in amber rather than green:
+- **Terminal Amber** — the same terminal, in amber rather than green:
   the other classic CRT phosphor colour, so it's a genuine alternate rather
   than the same theme renamed. Both terminal themes keep red for a disabled
   mod — a monochrome screen can still carry a second colour for an alert,
   the way a terminal's own warning text would.
+- **Cyberpunk** — acid yellow on near-black, the palette Cyberpunk 2077
+  builds its own interface from, with cyan standing in for green as the
+  positive colour. Corners are nearly square and table headings are set in
+  caps, since the look is signage rather than software. Yellow that bright
+  cannot carry light text, so anything sitting on a solid accent fill flips
+  to near-black. One flourish only: a heavy accent rule under the page
+  heading.
 
 A theme is a block of custom properties. Colour, the tints behind badges and
 notices, the text that sits on a solid fill, and the corner radii are all
 tokens on `:root`, so a theme mostly restates values rather than rewriting
-rules — Vortex is about 30 lines as a result. NMM, Liquid Glass, UESP and the
-two terminals are the ones that add rules of their own: a flat button that
-goes Windows-Aero-blue on hover and focus for NMM, blur and a bright inner
-edge for Liquid Glass, boxed `wikitable`-style cells for UESP, and brackets,
-caps and a scanline overlay for the terminals — the two terminals share that
-structural CSS in one rule and differ only in their colour tokens, which is
-what makes New Vegas a real "alternate" rather than a duplicate.
+rules — Vortex is about 30 lines as a result. NMM, Liquid Glass, UESP,
+Cyberpunk and the two terminals are the ones that add rules of their own: a
+flat button that goes Windows-Aero-blue on hover and focus for NMM, blur and a
+bright inner edge for Liquid Glass, boxed `wikitable`-style cells for UESP,
+an accent rule under the heading and uppercase table headings for Cyberpunk,
+and brackets, caps and a scanline overlay for the terminals — the two
+terminals share that structural CSS in one rule and differ only in their
+colour tokens, which is what makes Terminal Amber a real "alternate" rather
+than a duplicate.
 
 Two details that are easy to miss:
 
@@ -326,7 +335,10 @@ Two details that are easy to miss:
 - The stored preference is applied by a small script in the head, before the
   body paints, or the default would flash first. Anything unrecognised in
   storage resolves back to Midnight, since what is in there is whatever was
-  last written — including by an older version of this file.
+  last written — including by an older version of this file. The two terminals
+  were once named after the games they resemble and stored as `fo3` and `nv`;
+  those ids still resolve, to Terminal Green and Terminal Amber, so renaming
+  them did not silently reset anyone who had one selected.
 
 Liquid Glass drops to opaque surfaces on a flat background under
 `prefers-reduced-transparency: reduce`, which is what macOS and iOS set from
