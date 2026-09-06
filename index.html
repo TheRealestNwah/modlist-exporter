@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Modlist Exporter</title>
 <style>
   :root{
@@ -294,6 +295,49 @@
     display: none;
   }
   .empty-note.show{ display:block; }
+
+  /* --- narrow screens ---------------------------------------------------
+     Without this the page has no viewport of its own, so a phone lays it out
+     at ~980px and scales the result down: the table, which is the whole
+     point, ends up around 7px tall.
+
+     The rule here is that the table gets the width. Everything above it --
+     the four filter controls, the toggles, the export bar -- stacks to full
+     width, and the table scrolls sideways inside its own container rather
+     than making the page do it. */
+  @media (max-width: 760px){
+    body{ padding: 20px 14px 56px; }
+    h1{ font-size: 22px; }
+    .sub{ font-size: 14px; }
+
+    /* A 200px minimum is what makes the controls row overflow; below this
+       width they are one per line, so they can simply fill it. */
+    .field{ width: 100%; }
+    select, #searchInput{ width: 100%; min-width: 0; }
+    /* Except Game and Profile, which are short and are always shown and
+       hidden together -- so they share one row rather than costing two, and
+       the table starts a screen higher. Search keeps the full width because
+       it is typed into, Sort because it has the longest option labels. */
+    #gameField, #profileField{ width: calc(50% - 7px); }
+    .toggle-row{ margin-left: 0; width: 100%; }
+    .toggle-btn{ min-width: 0; }
+
+    .summary-bar{ align-items: flex-start; }
+    .export-btns{ flex-wrap: wrap; }
+    /* Comfortable enough to hit with a thumb. */
+    .export-btns button, .view-tabs button{ padding: 10px 14px; }
+
+    .table-scroll{ overflow-x: auto; }
+    /* Size to the content and scroll, rather than squeezing seven columns
+       into 360px. min-width keeps it filling the screen when the loaded
+       format has fewer columns -- an MO2 file has no size, collection or
+       endorsement column, and should not scroll for nothing. */
+    table{ width: max-content; min-width: 100%; }
+    /* A sideways-scrolling container becomes the scrollport, so a sticky
+       header would stick to it rather than to the viewport and silently do
+       nothing. It scrolls with the rows here. */
+    thead th{ position: static; }
+  }
 </style>
 </head>
 <body>
@@ -390,6 +434,7 @@
     </div>
   </div>
 
+  <div class="table-scroll">
   <table id="modTable">
     <thead>
       <tr>
@@ -405,7 +450,9 @@
     </thead>
     <tbody id="modTableBody"></tbody>
   </table>
+  </div>
 
+  <div class="table-scroll">
   <table id="diffTable">
     <thead>
       <tr>
@@ -416,6 +463,7 @@
     </thead>
     <tbody id="diffTableBody"></tbody>
   </table>
+  </div>
 
   <div class="missing-note" id="missingNote"></div>
 
