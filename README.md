@@ -63,7 +63,17 @@ install.
 
 ## Running it
 
-Just double-click `index.html`, or serve it locally:
+Use the [live demo](https://therealestnwah.github.io/modlist-exporter/), or
+download `modlist-exporter-<version>.html` from the
+[latest release](https://github.com/TheRealestNwah/modlist-exporter/releases/latest)
+and double-click it. That one file is the whole tool — there is nothing to
+install, nothing to unzip, and it works with no internet connection.
+
+(The "Source code" archives GitHub attaches to every release are the whole
+repository, tests and workflows included. The `.html` asset is the thing you
+actually want.)
+
+From a clone, double-click `index.html`, or serve it locally:
 
 ```bash
 python3 -m http.server 8000
