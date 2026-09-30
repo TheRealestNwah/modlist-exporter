@@ -12,6 +12,10 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
 
 <sub>Example data — not a real load order.</sub>
 
+> **Built with AI.** This project's code, tests and documentation were written in
+> collaboration with Claude, an AI model from Anthropic, directed and tested by
+> the maintainer. See [AI disclosure](#ai-disclosure).
+
 ## Features
 
 - Drag-and-drop (or click-to-browse) file loading — nothing ever leaves your
@@ -625,6 +629,13 @@ requires them to pass.
 Merging to `main` doesn't put anything live — the site only deploys when a
 release is published. See [`docs/deploying.md`](docs/deploying.md) for that
 flow and a GitHub Pages environment gotcha worth knowing before you cut one.
+
+## Support
+
+Everything on my GitHub is free of charge and open source. If you find it
+useful and want to leave a tip or buy me a coffee, you can do that at
+[ko-fi.com/morrowheat23](https://ko-fi.com/morrowheat23). It's appreciated,
+never expected.
 
 ## License
 
