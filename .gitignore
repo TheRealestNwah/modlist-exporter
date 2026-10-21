@@ -15,3 +15,6 @@ npm-debug.log*
 # Local test files — real Vortex exports shouldn't be committed
 *.local.json
 /test-data/
+
+# Private agent notes (CLAUDE.md is shared)
+CLAUDE.local.md
