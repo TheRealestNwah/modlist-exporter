@@ -24,3 +24,17 @@ There is no lint step and no install step.
 - `NAMES` in `extract.js` is maintained by hand. A newly extracted helper missing from it used to cause a wall of `ReferenceError`s; the guard now names the missing function. Add new pure helpers there.
 - There are two `<script>` blocks (a head one that applies the theme before first paint, and the main one). The harness picks the block that defines `parseModlist()`, not by position.
 - Releases are cut from the Actions tab (workflow dispatch), not by pushing tags. The built `.html` release asset is the deliverable.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
