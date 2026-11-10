@@ -47,6 +47,8 @@ const NAMES = [
   'defaultProfileFor',
   'gamesWithMods',
   'allGamesRows',
+  'allGamesExport',
+  'bulkExportSummary',
   'allGamesFileName',
   'diffDetail',
   'mdCell',
