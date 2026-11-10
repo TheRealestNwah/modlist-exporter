@@ -41,7 +41,9 @@ CSV, plain text, Markdown, BBCode, or clipboard copy.
   installed" sort, so "what did I add last week" doesn't need two snapshots
 - **Same Nexus page** — one mod page often ships a main file plus optional
   patches, each installing as its own mod. Mods sharing a page say so, rather
-  than looking like the same link repeated
+  than looking like the same link repeated. **One row per Nexus page** folds
+  them into a single row named after the page, with the other files listed
+  under *Also installed*
 - **Install size** — per-mod size and a total for whatever is currently shown,
   so you can see what's actually using the disk (Vortex only; MO2's
   `modlist.txt` records no sizes)
@@ -124,7 +126,7 @@ functions it lifts:
 `stripArchiveSuffix`, `vortexModName`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `installedAt`,
-`installedLabel`, `nexusPageCounts`, `loadOrderFor`, `gamesWithLoadOrder`,
+`installedLabel`, `nexusPageCounts`, `nexusPageKey`, `groupByNexusPage`, `loadOrderFor`, `gamesWithLoadOrder`,
 `loadOrderNote`, `themeIds`, `legacyThemeId`, `resolveTheme` and `themeMeta`.
 
 That list is maintained by hand, and forgetting to add a newly extracted
@@ -396,6 +398,11 @@ don't collide in the downloads folder. Game ids come out of the state file, so
 only plain slugs are allowed into a filename; anything else falls back to the
 generic name rather than being sanitised into something that no longer says
 what it holds.
+
+After each download, a line under the panel says what went out: *Exported 428
+mods from 15 games.* A game that contributed nothing is named there with the
+likely reason. The usual one is that **Enabled mods only** is on and that
+game's most recently activated profile has nothing enabled.
 
 Deliberately one flat sheet rather than a tab per game: a `Game` column can be
 filtered, sorted and pivoted in any spreadsheet app, which answers "what's my

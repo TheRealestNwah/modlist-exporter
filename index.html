@@ -1094,6 +1094,7 @@
     <div class="toggle-row">
       <label class="toggle-btn"><input type="checkbox" id="onlyEnabled" checked> Enabled mods only</label>
       <label class="toggle-btn" id="notEndorsedField"><input type="checkbox" id="notEndorsed"> Not yet endorsed</label>
+      <label class="toggle-btn" id="groupPagesField" title="Fold a page's main file, optional files and patches into one row"><input type="checkbox" id="groupPages"> One row per Nexus page</label>
     </div>
   </div>
 
@@ -1248,6 +1249,8 @@
   const sortInstalledOption = document.getElementById('sortInstalledOption');
   const notEndorsed = document.getElementById('notEndorsed');
   const notEndorsedField = document.getElementById('notEndorsedField');
+  const groupPages = document.getElementById('groupPages');
+  const groupPagesField = document.getElementById('groupPagesField');
   const missingNote = document.getElementById('missingNote');
   const viewOrderBtn = document.getElementById('viewOrderBtn');
   const orderTable = document.getElementById('orderTable');
@@ -1693,7 +1696,7 @@
     const modState = profile ? (profile.modState || {}) : null;
 
     const membership = collectionMembership(gameMods);
-    const pageCounts = nexusPageCounts(gameMods);
+    const pageCounts = nexusPageCounts(gameMods, gameId);
 
     let rows = Object.entries(gameMods).map(([modId, mod]) => {
       const attr = mod.attributes || {};
@@ -1739,6 +1742,9 @@
         endorsed: attr.endorsed,
         installed: installedAt(attr.installTime),
         pageSiblings: pageCounts.get(modId) || 0,
+        // For "one row per Nexus page": which page, and what it is called.
+        pageKey: nexusPageKey(attr, gameId),
+        pageName: attr.modName ? String(attr.modName) : '',
       };
     });
 
@@ -1785,6 +1791,7 @@
     const view = viewState(buildRows(parsed, gameSelect.value, profileSelect.value), {
       onlyEnabled: onlyEnabled.checked,
       notEndorsedOnly: notEndorsed.checked,
+      groupPages: groupPages.checked,
       search: searchInput.value,
       sort: sortSelect.value,
     });
@@ -1797,6 +1804,9 @@
     table.classList.toggle('no-when', !view.hasWhen);
     sortInstalledOption.hidden = !view.hasWhen;
     notEndorsedField.style.display = view.hasEndo ? '' : 'none';
+    // Still shown for a game with nothing to fold while it is switched on,
+    // since the bulk export reads it for every game.
+    groupPagesField.style.display = (view.hasPages || groupPages.checked) ? '' : 'none';
     // Only worth offering when there's more than one game to combine.
     showBulkExport(gamesWithMods(parsed).length > 1);
     sortOrderOption.hidden = !view.hasOrder;
@@ -1867,7 +1877,12 @@
       }
       // One Nexus page can ship several files, each installing as its own mod.
       // Saying so turns a link that looks repeated into one that is explained.
-      if (r.pageSiblings > 1){
+      if (r.alsoInstalled){
+        const note = document.createElement('span');
+        note.className = 'siblings';
+        note.textContent = '  · also installed: ' + r.alsoInstalled;
+        srcTd.appendChild(note);
+      } else if (r.pageSiblings > 1){
         const note = document.createElement('span');
         note.className = 'siblings';
         note.textContent = '  · ' + r.pageSiblings + ' from this page';
@@ -2142,6 +2157,7 @@
 
   onlyEnabled.addEventListener('change', refresh);
   notEndorsed.addEventListener('change', refresh);
+  groupPages.addEventListener('change', refresh);
   searchInput.addEventListener('input', () => { if (view === 'list') render(); });
   sortSelect.addEventListener('change', refresh);
   filterInputs.forEach(i => i.addEventListener('change', () => { if (view === 'diff') renderDiff(); }));
@@ -2448,6 +2464,12 @@
     if (options.notEndorsedOnly){
       rows = rows.filter(r => isUnendorsed(r.endorsed));
     }
+    // After the filters, so "Also installed" lists only files that passed
+    // them; before search, so a search finds the page by its own name.
+    const hasPages = (allRows || []).some(r => r.pageSiblings > 1);
+    if (options.groupPages && hasPages){
+      rows = groupByNexusPage(rows);
+    }
 
     // Column visibility is decided from the unfiltered set, so searching down
     // to a single mod with no recorded size doesn't make the column vanish.
@@ -2479,7 +2501,7 @@
 
     const totalBytes = rows.reduce((sum, r) => sum + (typeof r.size === 'number' ? r.size : 0), 0);
     return {
-      rows, sort, hasOrder, hasSize, hasColl, hasEndo, hasWhen, totalBytes,
+      rows, sort, hasOrder, hasSize, hasColl, hasEndo, hasWhen, hasPages, totalBytes,
       sizeTotalText: totalBytes > 0 ? '  ·  ' + formatSize(totalBytes) + ' on disk' : '',
       emptyNote: search.trim() ? 'No mods match that search.' : 'No mods match the current filter.',
     };
@@ -2620,12 +2642,52 @@
   // patches -- and each installs as its own mod. That is normal, so this
   // counts rather than flags: a mod sharing its page says so, and a mod that
   // is the only install from its page says nothing.
-  function nexusPageCounts(gameMods){
+  //
+  // A page is a Nexus mod ID *under a game*: the same number on another
+  // game's section is a different mod, and a file downloaded from another
+  // game's section (downloadGame) belongs to that game's page.
+  function nexusPageKey(attr, gameId){
+    const a = attr || {};
+    if (a.source !== 'nexus' || !a.modId) return null;
+    return nexusDomain(a.downloadGame || gameId || '').toLowerCase() + '/' + String(a.modId);
+  }
+
+  // "One row per Nexus page": files that came off the same page fold into one
+  // row. The main file is taken to be the largest -- optional files and
+  // patches are almost always smaller -- and gives the row its version and
+  // link; the row takes the page's name, and the rest are listed in
+  // alsoInstalled. Enabled if any of its files is. Rows not from Nexus pass
+  // through untouched.
+  function groupByNexusPage(rows){
+    const groups = new Map();
+    const items = [];
+    (rows || []).forEach(r => {
+      if (!r.pageKey){ items.push(r); return; }
+      let group = groups.get(r.pageKey);
+      if (!group){ group = []; groups.set(r.pageKey, group); items.push(group); }
+      group.push(r);
+    });
+    const out = items.map(item => {
+      if (!Array.isArray(item)) return item;
+      if (item.length === 1) return item[0];
+      const main = item.reduce((best, r) => ((r.size || 0) > (best.size || 0) ? r : best), item[0]);
+      const sized = item.filter(r => typeof r.size === 'number');
+      const states = item.map(r => r.enabled);
+      return Object.assign({}, main, {
+        name: main.pageName || main.name,
+        size: sized.length ? sized.reduce((sum, r) => sum + r.size, 0) : main.size,
+        enabled: states.includes(true) ? true : (states.every(s => s === null) ? null : false),
+        alsoInstalled: item.filter(r => r !== main)
+          .map(r => r.name + (r.version ? ' ' + r.version : '')).join('; '),
+      });
+    });
+    out.sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
+    return out;
+  }
+
+  function nexusPageCounts(gameMods, gameId){
     const perPage = new Map();
-    const pageOf = modId => {
-      const a = (gameMods[modId] || {}).attributes || {};
-      return (a.source === 'nexus' && a.modId) ? String(a.modId) : null;
-    };
+    const pageOf = modId => nexusPageKey((gameMods[modId] || {}).attributes, gameId);
     Object.keys(gameMods).forEach(modId => {
       const key = pageOf(modId);
       if (key) perPage.set(key, (perPage.get(key) || 0) + 1);
@@ -2829,11 +2891,12 @@
     }
     const { order: withOrder, size: withSize, coll: withColl, endo: withEndo,
             when: withWhen } = columnsIn(currentRows);
+    const withAlso = currentRows.some(r => r.alsoInstalled);
     const header = (withOrder ? ['#'] : [])
       .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [],
         withWhen ? ['Installed'] : [],
         withColl ? ['From collection'] : [], withEndo ? ['Endorsed'] : [],
-        ['From same Nexus page'],
+        ['From same Nexus page'], withAlso ? ['Also installed'] : [],
         ['Status','Source','Source URL']);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
@@ -2843,7 +2906,7 @@
           withWhen ? [csvBlank(installedLabel(r.installed))] : [],
           withColl ? [r.collectionText || ''] : [],
           withEndo ? [csvBlank(endorsementLabel(r.endorsed))] : [],
-          [r.pageSiblings > 1 ? r.pageSiblings : ''],
+          [r.pageSiblings > 1 ? r.pageSiblings : ''], withAlso ? [r.alsoInstalled || ''] : [],
           [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
     });
@@ -2869,6 +2932,7 @@
     const opts = {
       onlyEnabled: onlyEnabled.checked,
       notEndorsedOnly: notEndorsed.checked,
+      groupPages: groupPages.checked,
       search: searchInput.value,
       sort: sortSelect.value,
       games: selectedGames,
@@ -2879,13 +2943,14 @@
     // Fixed columns regardless of what each game happens to carry, so the
     // sheet stays rectangular and sortable.
     const lines = [['Game','Name','Version','Size','Size (bytes)','Installed','From collection',
-      'Endorsed','Status','Source','Source URL'].join(',')];
+      'Endorsed','From same Nexus page','Also installed','Status','Source','Source URL'].join(',')];
     rows.forEach(r => {
       lines.push([
         r.game, r.name, r.version,
         csvBlank(formatSize(r.size)), typeof r.size === 'number' ? r.size : '',
         csvBlank(installedLabel(r.installed)),
         r.collectionText || '', csvBlank(endorsementLabel(r.endorsed)),
+        r.pageSiblings > 1 ? r.pageSiblings : '', r.alsoInstalled || '',
         csvStatus(r.enabled),
         r.source, r.sourceUrl || '',
       ].map(csvCell).join(','));
