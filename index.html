@@ -1615,6 +1615,22 @@
     refresh();
   }
 
+  // Vortex's game IDs are mostly the same as Nexus's URL domains, but not
+  // always: a few games use IDs Nexus has retired or never used, and those
+  // links go nowhere. Anything not listed is already its own domain. Takes
+  // either kind of ID, since a Nexus domain passed in comes back unchanged.
+  function nexusDomain(gameId){
+    const id = String(gameId || '');
+    const map = {
+      falloutnv: 'newvegas',
+      skyrimse: 'skyrimspecialedition',
+      skyrimvr: 'skyrimspecialedition',
+      fallout4vr: 'fallout4',
+      teso: 'elderscrollsonline',
+    };
+    return Object.prototype.hasOwnProperty.call(map, id.toLowerCase()) ? map[id.toLowerCase()] : id;
+  }
+
   // Builds the row set for one loaded file. Parameterised on the source so
   // the diff can build a second file's rows without disturbing the view.
   function buildRows(source, gameId, profileKey){
@@ -1657,18 +1673,21 @@
       const isCollection = mod.type === 'collection';
       let sourceUrl = null;
       let source = fileSource || '—';
+      // A mod can come from another game's Nexus section (Fallout 3 mods in a
+      // Tale of Two Wastelands New Vegas setup), and Vortex records that game
+      // as downloadGame. The mod ID only means something under that game.
+      const nexusGame = nexusDomain(attr.downloadGame || gameId);
       if (isCollection){
         const slug = String(attr.collectionSlug || '');
-        const collectionGame = String(attr.downloadGame || gameId || '');
-        if (/^[a-z0-9_-]+$/i.test(slug) && /^[a-z0-9_-]+$/i.test(collectionGame)){
-          sourceUrl = 'https://www.nexusmods.com/games/' + collectionGame + '/collections/' + slug;
+        if (/^[a-z0-9_-]+$/i.test(slug) && /^[a-z0-9_-]+$/i.test(nexusGame)){
+          sourceUrl = 'https://www.nexusmods.com/games/' + nexusGame + '/collections/' + slug;
         }
         source = 'collection';
-      } else if (fileSource === 'nexus' && /^[a-z0-9]+$/i.test(String(gameId)) &&
+      } else if (fileSource === 'nexus' && /^[a-z0-9]+$/i.test(nexusGame) &&
           /^[0-9]+$/.test(String(nexusModId))){
-        // gameId and nexusModId come from the state file, so only build a link
-        // when both look like what Nexus URLs actually contain.
-        sourceUrl = 'https://www.nexusmods.com/' + gameId + '/mods/' + nexusModId;
+        // The game and nexusModId come from the state file, so only build a
+        // link when both look like what Nexus URLs actually contain.
+        sourceUrl = 'https://www.nexusmods.com/' + nexusGame + '/mods/' + nexusModId;
       }
       let enabled = null;
       if (modState){
