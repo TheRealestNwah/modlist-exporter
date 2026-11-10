@@ -1144,6 +1144,9 @@
       <button id="bulkGoBtn">Download all games CSV</button>
     </div>
   </div>
+  <!-- Outside the picker, which closes on download: this is where the export
+       says what it did, including any game it left out. -->
+  <div class="status" id="bulkStatus" role="status" aria-live="polite"></div>
 
   <div class="table-scroll">
   <table id="modTable">
@@ -1252,6 +1255,7 @@
   const orderNote = document.getElementById('orderNote');
   const bulkBtn = document.getElementById('bulkBtn');
   const bulkGoBtn = document.getElementById('bulkGoBtn');
+  const bulkStatus = document.getElementById('bulkStatus');
   const gamePicker = document.getElementById('gamePicker');
   const gamePickerList = document.getElementById('gamePickerList');
   const gamePickAll = document.getElementById('gamePickAll');
@@ -1532,6 +1536,7 @@
   // than the default one.
   function buildGamePicker(gameIds){
     selectedGames = gameIds.slice();
+    writeStatus(bulkStatus, '');
     gamePickerList.innerHTML = '';
     gameIds.forEach(g => {
       const label = document.createElement('label');
@@ -2523,16 +2528,60 @@
   // order is always the file's own, not the order boxes were ticked in, so
   // two exports of the same selection come out identical.
   function allGamesRows(source, opts){
-    const out = [];
+    return allGamesExport(source, opts).rows;
+  }
+
+  // The rows plus one entry per selected game saying what became of it, so
+  // the export can say which games it left out instead of dropping them
+  // silently (#48). The usual way a whole game vanishes: "Enabled mods only"
+  // is on, and the game's most recently activated profile has nothing
+  // enabled -- a freshly made profile, say -- so every row is filtered away.
+  function allGamesExport(source, opts){
+    const rows = [];
+    const games = [];
     const wanted = opts && Array.isArray(opts.games) ? new Set(opts.games) : null;
     gamesWithMods(source).forEach(gameId => {
       if (wanted && !wanted.has(gameId)) return;
-      const rows = buildRows(source, gameId, defaultProfileFor(source, gameId));
-      viewState(rows, opts).rows.forEach(r => {
-        out.push(Object.assign({ game: gameId }, r));
+      const profileKey = defaultProfileFor(source, gameId);
+      const all = buildRows(source, gameId, profileKey);
+      const kept = viewState(all, opts).rows;
+      kept.forEach(r => {
+        rows.push(Object.assign({ game: gameId }, r));
+      });
+      const profile = profileKey !== '__all__' ? source.profiles[profileKey] : null;
+      games.push({
+        game: gameId,
+        profile: profile ? String(profile.name || profileKey) : '',
+        installed: all.length,
+        enabled: all.filter(r => r.enabled === true).length,
+        exported: kept.length,
       });
     });
-    return out;
+    return { rows, games };
+  }
+
+  // One line for the status under the bulk export: how much went out, and
+  // each game that contributed nothing, with the likeliest reason.
+  function bulkExportSummary(games, opts){
+    const list = games || [];
+    const options = opts || {};
+    const mods = list.reduce((sum, g) => sum + g.exported, 0);
+    const used = list.filter(g => g.exported > 0).length;
+    const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+    let text = 'Exported ' + plural(mods, 'mod') + ' from ' +
+      (used === list.length ? plural(used, 'game') : used + ' of ' + plural(list.length, 'game')) + '.';
+    const left = list.filter(g => g.exported === 0);
+    if (left.length){
+      const why = g => {
+        const base = plural(g.installed, 'mod') + ' installed';
+        if (options.onlyEnabled && g.enabled === 0 && g.profile){
+          return base + ', none enabled in profile "' + g.profile + '"';
+        }
+        return base + ', none match the current filters';
+      };
+      text += ' Left out: ' + left.map(g => g.game + ' (' + why(g) + ')').join('; ') + '.';
+    }
+    return { text, complete: left.length === 0 };
   }
 
   // Names the bulk export after what is actually in it, so exporting two
@@ -2817,13 +2866,16 @@
 
   bulkGoBtn.addEventListener('click', () => {
     if (!selectedGames.length) return;
-    const rows = allGamesRows(parsed, {
+    const opts = {
       onlyEnabled: onlyEnabled.checked,
       notEndorsedOnly: notEndorsed.checked,
       search: searchInput.value,
       sort: sortSelect.value,
       games: selectedGames,
-    });
+    };
+    const { rows, games } = allGamesExport(parsed, opts);
+    const summary = bulkExportSummary(games, opts);
+    writeStatus(bulkStatus, summary.text, summary.complete ? 'ok' : 'err');
     // Fixed columns regardless of what each game happens to carry, so the
     // sheet stays rectangular and sortable.
     const lines = [['Game','Name','Version','Size','Size (bytes)','Installed','From collection',

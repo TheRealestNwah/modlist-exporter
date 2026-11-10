@@ -8,7 +8,7 @@ const path = require('node:path');
 const { parseMO2, parseModlist, diffRows, buildRows, nexusDomain, csvCell, formatSize, matchesQuery,
         collectionMembership, collectionLabel, viewState, availableViews,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
-        defaultProfileFor, gamesWithMods, allGamesRows,
+        defaultProfileFor, gamesWithMods, allGamesRows, allGamesExport, bulkExportSummary,
         installedAt, installedLabel, nexusPageCounts,
         loadOrderFor, gamesWithLoadOrder, loadOrderNote, allGamesFileName,
         columnsIn, csvStatus, statusLabel,
@@ -1006,6 +1006,53 @@ test('allGamesRows: a game named in the selection but absent is skipped', () => 
   const src = multi({ skyrimse: { a: { attributes: { name: 'A' } } } });
   assert.strictEqual(allGamesRows(src, { games: ['skyrimse', 'oblivion'] }).length, 1);
   assert.strictEqual(allGamesRows(src, { games: [] }).length, 0);
+});
+
+test('allGamesExport: a game whose profile has nothing enabled is reported, not just dropped (#48)', () => {
+  // The reported shape: "Enabled mods only" on, and the newest profile for a
+  // game has no mods enabled, so the whole game filters away.
+  const src = multi(
+    {
+      skyrimse: { a: { attributes: { name: 'A' } } },
+      fallout4: { b: { attributes: { name: 'B' } }, c: { attributes: { name: 'C' } } },
+    },
+    {
+      p1: { gameId: 'skyrimse', name: 'Main', modState: { a: { enabled: true } } },
+      p2: { gameId: 'fallout4', name: 'Fresh', modState: {} },
+    });
+  const res = allGamesExport(src, { onlyEnabled: true });
+  assert.deepStrictEqual(res.rows.map((r) => r.game), ['skyrimse']);
+  assert.deepStrictEqual(res.games, [
+    { game: 'skyrimse', profile: 'Main', installed: 1, enabled: 1, exported: 1 },
+    { game: 'fallout4', profile: 'Fresh', installed: 2, enabled: 0, exported: 0 },
+  ]);
+  const summary = bulkExportSummary(res.games, { onlyEnabled: true });
+  assert.strictEqual(summary.complete, false);
+  assert.strictEqual(summary.text,
+    'Exported 1 mod from 1 of 2 games. Left out: fallout4 (2 mods installed, none enabled in profile "Fresh").');
+});
+
+test('allGamesExport: rows match allGamesRows', () => {
+  const src = multi({ g1: { a: { attributes: { name: 'A' } } }, g2: { b: { attributes: { name: 'B' } } } });
+  assert.deepStrictEqual(allGamesExport(src, {}).rows, allGamesRows(src, {}));
+  assert.deepStrictEqual(allGamesExport(null, {}), { rows: [], games: [] });
+});
+
+test('bulkExportSummary: a complete export says so', () => {
+  const s = bulkExportSummary([
+    { game: 'a', profile: '', installed: 3, enabled: 0, exported: 3 },
+    { game: 'b', profile: 'P', installed: 1, enabled: 1, exported: 1 },
+  ], {});
+  assert.deepStrictEqual(s, { text: 'Exported 4 mods from 2 games.', complete: true });
+});
+
+test('bulkExportSummary: a search that empties a game blames the filters', () => {
+  const s = bulkExportSummary([
+    { game: 'a', profile: 'P', installed: 2, enabled: 2, exported: 1 },
+    { game: 'b', profile: 'P', installed: 1, enabled: 1, exported: 0 },
+  ], { onlyEnabled: true, search: 'x' });
+  assert.strictEqual(s.text,
+    'Exported 1 mod from 1 of 2 games. Left out: b (1 mod installed, none match the current filters).');
 });
 
 test('allGamesRows: no selection still means every game', () => {

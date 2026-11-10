@@ -119,7 +119,7 @@ functions it lifts:
 `collectionLabel`, `availableViews`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `columnsIn`, `csvStatus`, `defaultProfileFor`,
 `gamesWithMods`, `allGamesRows`,
-`allGamesFileName`,
+`allGamesExport`, `bulkExportSummary`, `allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `csvBlank`,
 `stripArchiveSuffix`, `vortexModName`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
