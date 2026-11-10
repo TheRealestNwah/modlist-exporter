@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseMO2, parseModlist, diffRows, buildRows, csvCell, formatSize, matchesQuery,
+const { parseMO2, parseModlist, diffRows, buildRows, nexusDomain, csvCell, formatSize, matchesQuery,
         collectionMembership, collectionLabel, viewState, availableViews,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
         defaultProfileFor, gamesWithMods, allGamesRows,
@@ -108,7 +108,30 @@ test('buildRows: name falls back through the attribute chain', () => {
 
 test('buildRows: a Nexus mod links to its mod page', () => {
   const [row] = buildRows(vortex({ a: { attributes: { name: 'A', source: 'nexus', modId: 6276 } } }), 'skyrimse', '__all__');
-  assert.strictEqual(row.sourceUrl, 'https://www.nexusmods.com/skyrimse/mods/6276');
+  assert.strictEqual(row.sourceUrl, 'https://www.nexusmods.com/skyrimspecialedition/mods/6276');
+});
+
+test('buildRows: Vortex game IDs are mapped to their live Nexus domains (#49)', () => {
+  const mod = { a: { attributes: { name: 'A', source: 'nexus', modId: 42 } } };
+  const linkFor = (gameId) => buildRows({ type: 'vortex', mods: { [gameId]: mod }, profiles: {} }, gameId, '__all__')[0].sourceUrl;
+  assert.strictEqual(linkFor('falloutnv'), 'https://www.nexusmods.com/newvegas/mods/42');
+  assert.strictEqual(linkFor('skyrimse'), 'https://www.nexusmods.com/skyrimspecialedition/mods/42');
+  assert.strictEqual(linkFor('fallout4'), 'https://www.nexusmods.com/fallout4/mods/42');
+});
+
+test('buildRows: a mod from another game links under the game it came from (#50)', () => {
+  const [row] = buildRows({ type: 'vortex', profiles: {}, mods: { falloutnv: {
+    a: { attributes: { name: 'Megaton Re Done', source: 'nexus', modId: 999, downloadGame: 'fallout3' } },
+  } } }, 'falloutnv', '__all__');
+  assert.strictEqual(row.sourceUrl, 'https://www.nexusmods.com/fallout3/mods/999');
+});
+
+test('nexusDomain: maps retired IDs and passes everything else through', () => {
+  assert.strictEqual(nexusDomain('falloutnv'), 'newvegas');
+  assert.strictEqual(nexusDomain('skyrimse'), 'skyrimspecialedition');
+  assert.strictEqual(nexusDomain('newvegas'), 'newvegas');
+  assert.strictEqual(nexusDomain('witcher3'), 'witcher3');
+  assert.strictEqual(nexusDomain(undefined), '');
 });
 
 test('buildRows: a non-numeric modId does not produce a link', () => {
