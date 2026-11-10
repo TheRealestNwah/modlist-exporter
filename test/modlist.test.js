@@ -9,7 +9,7 @@ const { parseMO2, parseModlist, diffRows, buildRows, nexusDomain, csvCell, forma
         collectionMembership, collectionLabel, viewState, availableViews,
         missingCollectionMembers, endorsementLabel, isUnendorsed,
         defaultProfileFor, gamesWithMods, allGamesRows, allGamesExport, bulkExportSummary,
-        installedAt, installedLabel, nexusPageCounts,
+        installedAt, installedLabel, nexusPageCounts, nexusPageKey, groupByNexusPage,
         loadOrderFor, gamesWithLoadOrder, loadOrderNote, allGamesFileName,
         columnsIn, csvStatus, statusLabel,
         mdCell, bbSafe, safeHttpUrl, mdLink, bbLink,
@@ -850,6 +850,75 @@ test('nexusPageCounts: non-Nexus mods are not counted at all', () => {
 
 test('nexusPageCounts: a nexus mod with no modId is not grouped', () => {
   assert.strictEqual(nexusPageCounts({ a: { attributes: { source: 'nexus' } } }).size, 0);
+});
+
+test('nexusPageCounts: the same modId under different games is two pages (#53)', () => {
+  // Tale of Two Wastelands: a Fallout 3 mod 1234 and a New Vegas mod 1234
+  // installed side by side are unrelated.
+  const counts = nexusPageCounts({
+    a: { attributes: { source: 'nexus', modId: 1234 } },
+    b: { attributes: { source: 'nexus', modId: 1234, downloadGame: 'fallout3' } },
+  }, 'falloutnv');
+  assert.strictEqual(counts.get('a'), 1);
+  assert.strictEqual(counts.get('b'), 1);
+});
+
+test('nexusPageKey: keyed by Nexus domain and mod ID', () => {
+  assert.strictEqual(nexusPageKey({ source: 'nexus', modId: 12 }, 'skyrimse'), 'skyrimspecialedition/12');
+  assert.strictEqual(nexusPageKey({ source: 'nexus', modId: 12, downloadGame: 'skyrimspecialedition' }, 'skyrimse'),
+    'skyrimspecialedition/12', 'a retired and a current game ID are the same page');
+  assert.strictEqual(nexusPageKey({ source: 'website', modId: 12 }, 'skyrimse'), null);
+  assert.strictEqual(nexusPageKey(undefined, 'skyrimse'), null);
+});
+
+function pageMods(){
+  return vortex({
+    main: { attributes: { source: 'nexus', modId: 5, modName: 'Better Enemy Health',
+      logicalFileName: 'Better Enemy Health Main', version: '2.0', fileSize: 900 } },
+    fonts: { attributes: { source: 'nexus', modId: 5, modName: 'Better Enemy Health',
+      logicalFileName: 'My Universal Fonts', version: '1.0', fileSize: 100 } },
+    solo: { attributes: { source: 'nexus', modId: 9, modName: 'Alone', version: '3', fileSize: 50 } },
+    local: { attributes: { name: 'Hand Made' } },
+  });
+}
+
+test('groupByNexusPage: folds a page into one row named after the page (#53)', () => {
+  const rows = groupByNexusPage(buildRows(pageMods(), 'skyrimse', '__all__'));
+  assert.deepStrictEqual(rows.map((r) => r.name), ['Alone', 'Better Enemy Health', 'Hand Made']);
+  const beh = rows.find((r) => r.name === 'Better Enemy Health');
+  assert.strictEqual(beh.version, '2.0', 'version comes from the main (largest) file');
+  assert.strictEqual(beh.alsoInstalled, 'My Universal Fonts 1.0');
+  assert.strictEqual(beh.size, 1000);
+  assert.ok(!rows.find((r) => r.name === 'Alone').alsoInstalled, 'a lone file is untouched');
+});
+
+test('groupByNexusPage: a page is enabled if any of its files is', () => {
+  const rows = groupByNexusPage([
+    { name: 'a', pageKey: 'g/1', enabled: false, size: 10 },
+    { name: 'b', pageKey: 'g/1', enabled: true, size: 1 },
+  ]);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].enabled, true);
+  assert.deepStrictEqual(groupByNexusPage(undefined), []);
+});
+
+test('viewState: groupPages folds pages only when asked', () => {
+  const all = buildRows(pageMods(), 'skyrimse', '__all__');
+  assert.strictEqual(viewState(all, {}).rows.length, 4);
+  const grouped = viewState(all, { groupPages: true });
+  assert.strictEqual(grouped.rows.length, 3);
+  assert.strictEqual(grouped.hasPages, true);
+  assert.strictEqual(viewState(all, { groupPages: true, search: 'better' }).rows.length, 1);
+});
+
+test('viewState: grouping comes after the enabled filter', () => {
+  // A disabled optional file shouldn't be listed as "also installed" in an
+  // export of enabled mods.
+  const src = pageMods();
+  src.profiles = { p: { gameId: 'skyrimse', modState: { main: { enabled: true }, fonts: { enabled: false } } } };
+  const rows = viewState(buildRows(src, 'skyrimse', 'p'), { onlyEnabled: true, groupPages: true }).rows;
+  const beh = rows.find((r) => r.modId === 'main');
+  assert.ok(!beh.alsoInstalled);
 });
 
 test('buildRows: carries the install date and the page group size', () => {

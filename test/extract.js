@@ -66,6 +66,8 @@ const NAMES = [
   'installedAt',
   'installedLabel',
   'nexusPageCounts',
+  'nexusPageKey',
+  'groupByNexusPage',
   'themeIds',
   'legacyThemeId',
   'resolveTheme',
