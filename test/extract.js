@@ -28,6 +28,7 @@ const NAMES = [
   'csvStatus',
   'diffRows',
   'buildRows',
+  'nexusDomain',
   'csvCell',
   'csvBlank',
   'stripArchiveSuffix',

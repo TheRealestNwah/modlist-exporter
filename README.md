@@ -114,7 +114,7 @@ elements — a small one in the head that applies the stored theme before first
 paint, and the main one at the end — so the harness picks the block by looking
 for the one that defines `parseModlist()` rather than by position. The
 functions it lifts:
-`parseMO2`, `parseModlist`, `buildRows`, `viewState`, `diffRows`,
+`parseMO2`, `parseModlist`, `buildRows`, `nexusDomain`, `viewState`, `diffRows`,
 `indexModsForMatching`, `matchRule`, `collectionMembership`,
 `collectionLabel`, `availableViews`, `missingCollectionMembers`, `endorsementLabel`,
 `isUnendorsed`, `columnsIn`, `csvStatus`, `defaultProfileFor`,
