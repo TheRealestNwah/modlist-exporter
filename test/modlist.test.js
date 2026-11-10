@@ -16,6 +16,8 @@ const { parseMO2, parseModlist, diffRows, buildRows, nexusDomain, csvCell, forma
         markdownLines, bbcodeLines, markdownDiffLines, bbcodeDiffLines,
         themeIds, resolveTheme, themeMeta, legacyThemeId } = require('./extract.js');
 
+const { csvBlank, diffDetail } = require('./extract.js');
+
 const NL = '\n';
 const mo2 = (...lines) => lines.join(NL);
 
@@ -104,6 +106,59 @@ test('buildRows: name falls back through the attribute chain', () => {
   }), 'skyrimse', '__all__');
   const byId = Object.fromEntries(rows.map((r) => [r.modId, r.name]));
   assert.deepStrictEqual(byId, { a: 'Custom', b: 'Name', c: 'Logical', d: 'd' });
+});
+
+test('buildRows: archive-shaped names are cleaned up (#51)', () => {
+  const rows = buildRows(vortex({
+    a: { attributes: { name: 'SkyUI-12604-5-2SE-1577123456', source: 'nexus', modId: 12604 } },
+    b: { attributes: { customFileName: 'Better Bodies-42399-2-2', source: 'nexus', modId: 42399 } },
+    c: { attributes: { name: 'Compact Inventory 2230 1.1 2026-08-07T03-25Z x', source: 'nexus', modId: 2230 } },
+    d: { attributes: { name: 'Patch 2230 Edition', source: 'nexus', modId: 77 } },
+  }), 'skyrimse', '__all__');
+  const byId = Object.fromEntries(rows.map((r) => [r.modId, r.name]));
+  assert.deepStrictEqual(byId, {
+    a: 'SkyUI', b: 'Better Bodies', c: 'Compact Inventory',
+    // The number is not this mod's own ID, so the name is left alone.
+    d: 'Patch 2230 Edition',
+  });
+});
+
+test('buildRows: the Nexus page name beats an archive name, but not a real rename (#51)', () => {
+  const rows = buildRows(vortex({
+    a: { attributes: { customFileName: 'SkyUI-12604-5-2SE-1', modName: 'SkyUI', source: 'nexus', modId: 12604 } },
+    b: { attributes: { customFileName: 'My Renamed Mod', modName: 'Page Name', source: 'nexus', modId: 5 } },
+  }), 'skyrimse', '__all__');
+  const byId = Object.fromEntries(rows.map((r) => [r.modId, r.name]));
+  assert.deepStrictEqual(byId, { a: 'SkyUI', b: 'My Renamed Mod' });
+});
+
+test('buildRows: files from one Nexus page keep their own names (#51)', () => {
+  const rows = buildRows(vortex({
+    a: { attributes: { logicalFileName: 'Better Enemy Health', modName: 'Better Enemy Health', source: 'nexus', modId: 10 } },
+    b: { attributes: { logicalFileName: 'My Universal Fonts', modName: 'Better Enemy Health', source: 'nexus', modId: 10 } },
+  }), 'skyrimse', '__all__');
+  assert.deepStrictEqual(rows.map((r) => r.name), ['Better Enemy Health', 'My Universal Fonts']);
+});
+
+test('buildRows: an unknown version or source is blank, not a dash (#52)', () => {
+  const [v] = buildRows(vortex({ a: { attributes: { name: 'Stash Organizer' } } }), 'skyrimse', '__all__');
+  assert.strictEqual(v.version, '');
+  assert.strictEqual(v.source, '');
+  const m = buildRows({ type: 'mo2', entries: parseMO2('+Managed\n*DLC') }, null, null);
+  assert.deepStrictEqual(m.map((r) => [r.name, r.version, r.source]),
+    [['DLC', '', 'unmanaged'], ['Managed', '', '']]);
+});
+
+test('csvBlank: dash labels become blank cells, anything else is kept', () => {
+  assert.strictEqual(csvBlank('—'), '');
+  assert.strictEqual(csvBlank('45.0 MB'), '45.0 MB');
+  assert.strictEqual(csvBlank(''), '');
+});
+
+test('diffDetail: an unknown version reads as none', () => {
+  const d = diffRows([{ modId: 'a', name: 'A', version: '', enabled: null }],
+    [{ modId: 'a', name: 'A', version: '1.0', enabled: null }])[0];
+  assert.strictEqual(diffDetail(d), 'version none -> 1.0');
 });
 
 test('buildRows: a Nexus mod links to its mod page', () => {
@@ -1147,7 +1202,7 @@ test('bbcodeLines: an unknown status is left off rather than shown as a dash', (
 });
 
 test('bbcodeLines: a missing version is left off, and a size is included', () => {
-  assert.strictEqual(bbcodeLines([V('A', { version: '—', size: 47185920 })])[1],
+  assert.strictEqual(bbcodeLines([V('A', { version: '', size: 47185920 })])[1],
     '[*]A — 45.0 MB (enabled)');
 });
 

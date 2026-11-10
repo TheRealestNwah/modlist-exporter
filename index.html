@@ -1615,6 +1615,36 @@
     refresh();
   }
 
+  // Vortex often has nothing nicer than the downloaded archive's name, which
+  // still carries the Nexus mod ID, version and upload time:
+  // "SkyUI-12604-5-2SE-1577123456" or "Compact Inventory 2230 1.1 2026-...".
+  // Everything from the mod ID on is cut, but only when the ID is this mod's
+  // own, so a real name that happens to contain a number is left alone.
+  function stripArchiveSuffix(name, nexusModId){
+    const text = String(name || '').trim();
+    const id = String(nexusModId === undefined || nexusModId === null ? '' : nexusModId);
+    if (!text || !/^[0-9]+$/.test(id)) return text;
+    const m = text.match(new RegExp('^(.+?)[-\\s]+' + id + '(?:[-\\s].*)?$'));
+    const cut = m ? m[1].replace(/[-\s]+$/, '').trim() : '';
+    return cut || text;
+  }
+
+  // The name a Vortex mod is shown and exported under. A custom name counts
+  // only if it is a real rename, not an archive name Vortex filled in. After
+  // that the Nexus page name, unless several files came off the same page:
+  // then each keeps its own file name, so a main file and its optional patch
+  // don't come out as two identical rows.
+  function vortexModName(attr, sharesPage){
+    const a = attr || {};
+    const custom = String(a.customFileName || '').trim();
+    if (custom && stripArchiveSuffix(custom, a.modId) === custom) return custom;
+    if (a.modName && !sharesPage) return String(a.modName);
+    const fileName = [a.customFileName, a.name, a.logicalFileName]
+      .map(n => stripArchiveSuffix(n, a.modId))
+      .find(Boolean);
+    return fileName || (a.modName ? String(a.modName) : '');
+  }
+
   // Vortex's game IDs are mostly the same as Nexus's URL domains, but not
   // always: a few games use IDs Nexus has retired or never used, and those
   // links go nowhere. Anything not listed is already its own domain. Takes
@@ -1643,9 +1673,9 @@
         .forEach((entry, i) => paneRank.set(entry, i + 1));
 
       let rows = source.entries.map(entry => ({
-        modId: entry.name, name: entry.name, version: '—',
+        modId: entry.name, name: entry.name, version: '',
         enabled: entry.enabled, sourceUrl: null,
-        source: entry.unmanaged ? 'unmanaged' : '—',
+        source: entry.unmanaged ? 'unmanaged' : '',
         order: paneRank.get(entry)
       }));
       rows.sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
@@ -1662,8 +1692,10 @@
 
     let rows = Object.entries(gameMods).map(([modId, mod]) => {
       const attr = mod.attributes || {};
-      const name = attr.customFileName || attr.name || attr.logicalFileName || modId;
-      const version = attr.version || attr.newestVersion || '—';
+      const name = vortexModName(attr, (pageCounts.get(modId) || 0) > 1) || modId;
+      // Unknown stays blank in the data, so every export writes an empty
+      // cell. Only the on-screen table draws a dash for it.
+      const version = attr.version || attr.newestVersion || '';
       const nexusModId = attr.modId;
       const fileSource = attr.source || '';
       // A Nexus collection is installed as a mod, but it has no modId -- it
@@ -1672,7 +1704,7 @@
       // click, since the mod-page link can't be built.
       const isCollection = mod.type === 'collection';
       let sourceUrl = null;
-      let source = fileSource || '—';
+      let source = fileSource;
       // A mod can come from another game's Nexus section (Fallout 3 mods in a
       // Tale of Two Wastelands New Vegas setup), and Vortex records that game
       // as downloadGame. The mod ID only means something under that game.
@@ -1785,7 +1817,7 @@
         nameTd.appendChild(idDiv);
       }
 
-      cell(tr, 'ver', r.version);
+      cell(tr, 'ver', r.version || '—');
       cell(tr, 'size', formatSize(r.size));
       cell(tr, 'when', installedLabel(r.installed));
 
@@ -1826,7 +1858,7 @@
         a.textContent = r.source + ' ↗';
         srcTd.appendChild(a);
       } else {
-        srcTd.textContent = r.source;
+        srcTd.textContent = r.source || '—';
       }
       // One Nexus page can ship several files, each installing as its own mod.
       // Saying so turns a link that looks repeated into one that is explained.
@@ -1944,17 +1976,17 @@
           detTd.appendChild(document.createTextNode(c.field + ' '));
           const from = document.createElement('span');
           from.className = 'from';
-          from.textContent = String(c.from);
+          from.textContent = c.from === '' ? '—' : String(c.from);
           detTd.appendChild(from);
           detTd.appendChild(document.createTextNode(' → '));
           const to = document.createElement('span');
           to.className = 'to';
-          to.textContent = String(c.to);
+          to.textContent = c.to === '' ? '—' : String(c.to);
           detTd.appendChild(to);
         });
       } else {
         const bits = [];
-        if (d.row.version && d.row.version !== '—') bits.push('v' + d.row.version);
+        if (d.row.version) bits.push('v' + d.row.version);
         bits.push(statusLabel(d.row.enabled));
         detTd.textContent = bits.join('  ·  ');
       }
@@ -2242,7 +2274,7 @@
     list.forEach(r => {
       const prefix = withOrder && typeof r.order === 'number' ? r.order + '. ' : '';
       const parts = [bbLink(r.name, r.sourceUrl)];
-      if (r.version && r.version !== '—') parts.push(bbSafe(r.version));
+      if (r.version) parts.push(bbSafe(r.version));
       if (typeof r.size === 'number') parts.push(formatSize(r.size));
       const status = statusLabel(r.enabled);
       out.push('[*]' + prefix + parts.join(' — ') +
@@ -2633,6 +2665,13 @@
     return enabled === null || enabled === undefined ? '' : (enabled ? 'enabled' : 'disabled');
   }
 
+  // The table draws an unknown value as a dash; a spreadsheet should see a
+  // blank cell instead, or it reads the dash as data. For labels only, never
+  // for names, which mod authors could set to anything.
+  function csvBlank(label){
+    return label === '—' ? '' : label;
+  }
+
   // Compares two row sets keyed by modId (which is the mod name for MO2).
   // Direction is oldest -> newest by file timestamp, so 'added' means the mod
   // is present in the newer file only.
@@ -2680,7 +2719,9 @@
   // Plain-text rendering of what changed. Empty for added/removed rows,
   // which have no before/after to show.
   function diffDetail(d){
-    return d.changes ? d.changes.map(c => c.field + ' ' + c.from + ' -> ' + c.to).join('; ') : '';
+    // A blank side is an unknown version; say so rather than leave a gap.
+    const show = v => (v === '' ? 'none' : v);
+    return d.changes ? d.changes.map(c => c.field + ' ' + show(c.from) + ' -> ' + show(c.to)).join('; ') : '';
   }
 
   function diffTextLines(){
@@ -2716,7 +2757,7 @@
     return currentRows.map(r => {
       const status = r.enabled === null ? '' : (r.enabled ? ' [enabled]' : ' [disabled]');
       const prefix = withOrder && typeof r.order === 'number' ? r.order + '. ' : '';
-      return prefix + r.name + ' — ' + r.version + status;
+      return prefix + r.name + (r.version ? ' — ' + r.version : '') + status;
     });
   }
 
@@ -2749,10 +2790,10 @@
     currentRows.forEach(r => {
       const fields = (withOrder ? [typeof r.order === 'number' ? r.order : ''] : [])
         .concat([r.name, r.version],
-          withSize ? [formatSize(r.size), typeof r.size === 'number' ? r.size : ''] : [],
-          withWhen ? [installedLabel(r.installed)] : [],
+          withSize ? [csvBlank(formatSize(r.size)), typeof r.size === 'number' ? r.size : ''] : [],
+          withWhen ? [csvBlank(installedLabel(r.installed))] : [],
           withColl ? [r.collectionText || ''] : [],
-          withEndo ? [endorsementLabel(r.endorsed)] : [],
+          withEndo ? [csvBlank(endorsementLabel(r.endorsed))] : [],
           [r.pageSiblings > 1 ? r.pageSiblings : ''],
           [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
       lines.push(fields.map(csvCell).join(','));
@@ -2790,9 +2831,9 @@
     rows.forEach(r => {
       lines.push([
         r.game, r.name, r.version,
-        formatSize(r.size), typeof r.size === 'number' ? r.size : '',
-        installedLabel(r.installed),
-        r.collectionText || '', endorsementLabel(r.endorsed),
+        csvBlank(formatSize(r.size)), typeof r.size === 'number' ? r.size : '',
+        csvBlank(installedLabel(r.installed)),
+        r.collectionText || '', csvBlank(endorsementLabel(r.endorsed)),
         csvStatus(r.enabled),
         r.source, r.sourceUrl || '',
       ].map(csvCell).join(','));
