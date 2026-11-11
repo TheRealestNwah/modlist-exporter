@@ -33,6 +33,7 @@ const NAMES = [
   'csvBlank',
   'stripArchiveSuffix',
   'vortexModName',
+  'modPubArchive',
   'formatSize',
   'matchesQuery',
   'indexModsForMatching',
