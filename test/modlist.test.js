@@ -161,6 +161,24 @@ test('diffDetail: an unknown version reads as none', () => {
   assert.strictEqual(diffDetail(d), 'version none -> 1.0');
 });
 
+test('buildRows: ModPub archives supply clean names and source links (#60)', () => {
+  const organizer = 'Stash Organizer INI-4-3.0.0-2025.04.29-[mod.pub]';
+  const source = { type: 'vortex', mods: { falloutnv: {
+    organizer: { attributes: { fileName: organizer + '.7z', name: organizer } },
+    'YUPTTW 13.5-133-13.5.0-2025.11.09-[mod.pub]': { attributes: {} },
+    renamed: { installationPath: organizer, attributes: { customFileName: 'My configuration' } },
+    'Tale of Two Wastelands': { attributes: {} },
+    'Incomplete-133-[mod.pub]': { attributes: {} },
+  } } };
+  const rows = buildRows(source, 'falloutnv', '__all__');
+  assert.deepStrictEqual(rows.filter(r => r.sourceUrl).map(r => [r.name, r.source, r.sourceUrl]), [
+    ['My configuration', 'mod.pub', 'https://mod.pub/falloutnv/4-mod'],
+    ['Stash Organizer INI', 'mod.pub', 'https://mod.pub/falloutnv/4-mod'],
+    ['YUPTTW 13.5', 'mod.pub', 'https://mod.pub/falloutnv/133-mod'],
+  ]);
+  for (const row of rows.filter(r => !r.sourceUrl)) assert.strictEqual(row.source, '');
+});
+
 test('buildRows: a Nexus mod links to its mod page', () => {
   const [row] = buildRows(vortex({ a: { attributes: { name: 'A', source: 'nexus', modId: 6276 } } }), 'skyrimse', '__all__');
   assert.strictEqual(row.sourceUrl, 'https://www.nexusmods.com/skyrimspecialedition/mods/6276');
@@ -1457,7 +1475,8 @@ test('real Vortex backups on this machine parse and diff', {
     for (const row of a.concat(b)) {
       assert.ok(typeof row.name === 'string' && row.name.length > 0, 'every row needs a name');
       if (row.sourceUrl) {
-        assert.match(row.sourceUrl, /^https:\/\/www\.nexusmods\.com\//, 'links must point at nexusmods.com');
+        const expected = row.source === 'mod.pub' ? 'mod.pub' : 'www.nexusmods.com';
+        assert.strictEqual(new URL(row.sourceUrl).origin, 'https://' + expected);
       }
     }
     // Must not throw, and must account for every mod on both sides.
