@@ -42,13 +42,14 @@ const FIXTURE = JSON.stringify({ persistent: {
         installTime: '2026-01-02T10:00:00Z' },
         rules: [{ type: 'requires', reference: { fileMD5: 'm1' } },
                 { type: 'requires', reference: { description: 'Not Installed' } }] },
-      a: { attributes: { name: 'Patch for Purists', fileMD5: 'm1', source: 'nexus',
+      a: { attributes: { name: 'Patch for Purists', modName: 'Purist Fixes', fileMD5: 'm1', source: 'nexus',
         modId: 46599, modSize: 12582912, endorsed: 'Undecided',
         installTime: '2026-02-01T10:00:00Z' } },
       b: { attributes: { name: 'Better Bodies', source: 'nexus', modId: 46599,
         modSize: 4194304, installTime: '2024-05-05T10:00:00Z' } },
     },
-    skyrimse: { s: { attributes: { name: 'SkyUI', modSize: 9437184 } } },
+    skyrimse: { s: { attributes: { name: 'SkyUI Main File', modName: 'SkyUI', source: 'nexus',
+      modId: 12604, modSize: 9437184 } } },
   },
   profiles: {
     pm: { gameId: 'morrowind', name: 'Default', lastActivated: 9,
@@ -205,9 +206,7 @@ test('smoke: a game with no load order explains itself instead of looking broken
   assert.match(out.note, /morrowind/, 'it names a game that does have one');
 });
 
-test('smoke: the export buttons are wired and produce content', { skip }, async () => {
-  // Unit tests cover what the exports say; this covers whether clicking the
-  // button reaches that code at all.
+test('smoke: CSV page columns describe the exported rows (#58, #59, #61)', { skip }, async () => {
   const out = await withPage(async ({ evaluate }) => {
     await evaluate(loadFile('manual.json', FIXTURE, 'application/json'));
     return evaluate(`
@@ -220,14 +219,48 @@ test('smoke: the export buttons are wired and produce content', { skip }, async 
         if (tag === 'a') Object.defineProperty(el, 'click', { value: () => { filename = el.download; } });
         return el;
       };
-      document.getElementById('csvBtn').click();
+      function read(button) {
+        document.getElementById(button).click();
+        // This fixture's fields contain no commas or newlines.
+        const [header, ...lines] = captured.trim().split(String.fromCharCode(10));
+        const columns = header.trim().split(',');
+        const rows = lines.map(line => {
+          const fields = line.trim().split(',').map(field => field.slice(1, -1));
+          if (fields.length !== columns.length) throw new Error('CSV row width differs from header');
+          return Object.fromEntries(columns.map((column, i) => [column, fields[i]]));
+        });
+        return { filename, columns, rows };
+      }
+      function toggle(id, checked) {
+        const box = document.getElementById(id);
+        box.checked = checked;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const single = read('csvBtn');
+      document.getElementById('bulkBtn').click();
+      const filtered = read('bulkGoBtn');
+      toggle('onlyEnabled', false);
+      const ungrouped = read('bulkGoBtn');
+      toggle('groupPages', true);
+      const grouped = read('bulkGoBtn');
       document.createElement = realCreate;
       window.Blob = RealBlob;
-      return { filename, header: (captured || '').split(String.fromCharCode(10))[0] };
+      return { single, filtered, ungrouped, grouped };
     `);
   });
-  assert.strictEqual(out.filename, 'vortex-modlist.csv');
-  assert.match(out.header, /^Name,Version/);
+  const find = (sheet, name) => sheet.rows.find(row => row.Name === name);
+  assert.strictEqual(out.single.filename, 'vortex-modlist.csv');
+  assert.deepStrictEqual(out.single.columns.slice(0, 2), ['Name', 'Version']);
+  assert.strictEqual(find(out.single, 'Patch for Purists')['From same Nexus page'], '');
+  assert.strictEqual(find(out.filtered, 'Patch for Purists')['From same Nexus page'], '');
+  assert.strictEqual(find(out.filtered, 'SkyUI Main File')['Mod Name'], 'SkyUI');
+  assert.strictEqual(out.filtered.columns.includes('Also installed'), false);
+  assert.strictEqual(out.ungrouped.columns.includes('Also installed'), false);
+  assert.strictEqual(find(out.ungrouped, 'Patch for Purists')['From same Nexus page'], '2');
+  assert.strictEqual(find(out.ungrouped, 'Better Bodies')['From same Nexus page'], '2');
+  assert.strictEqual(find(out.grouped, 'Purist Fixes')['Mod Name'], 'Purist Fixes');
+  assert.strictEqual(find(out.grouped, 'Purist Fixes')['Also installed'], 'Better Bodies');
+  assert.strictEqual(find(out.grouped, 'Purist Fixes')['From same Nexus page'], '');
 });
 
 test('smoke: an MO2 file hides everything Vortex-only', { skip }, async () => {

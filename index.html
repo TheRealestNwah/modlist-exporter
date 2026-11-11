@@ -1744,7 +1744,8 @@
         pageSiblings: pageCounts.get(modId) || 0,
         // For "one row per Nexus page": which page, and what it is called.
         pageKey: nexusPageKey(attr, gameId),
-        pageName: attr.modName ? String(attr.modName) : '',
+        pageName: fileSource === 'nexus' && !isCollection && attr.modName ? String(attr.modName) : '',
+        fileName: fileSource === 'nexus' && !isCollection ? vortexModName(attr, true) : '',
       };
     });
 
@@ -2673,8 +2674,11 @@
       const main = item.reduce((best, r) => ((r.size || 0) > (best.size || 0) ? r : best), item[0]);
       const sized = item.filter(r => typeof r.size === 'number');
       const states = item.map(r => r.enabled);
+      const pageName = main.pageName || (item.find(r => r.pageName) || {}).pageName || '';
       return Object.assign({}, main, {
-        name: main.pageName || main.name,
+        name: pageName || main.name,
+        pageName,
+        fileName: '',
         size: sized.length ? sized.reduce((sum, r) => sum + r.size, 0) : main.size,
         enabled: states.includes(true) ? true : (states.every(s => s === null) ? null : false),
         alsoInstalled: item.filter(r => r !== main)
@@ -2872,6 +2876,17 @@
     });
   }
 
+  // Count only Nexus mod rows in the finished CSV, after filtering and grouping.
+  function exportedPageCounts(rows){
+    const counts = new Map();
+    rows.forEach(r => {
+      if (r.source === 'nexus' && r.sourceUrl){
+        counts.set(r.sourceUrl, (counts.get(r.sourceUrl) || 0) + 1);
+      }
+    });
+    return counts;
+  }
+
   csvBtn.addEventListener('click', () => {
     if (view === 'order'){
       const lines = ['#,Plugin,Status'];
@@ -2892,22 +2907,25 @@
     const { order: withOrder, size: withSize, coll: withColl, endo: withEndo,
             when: withWhen } = columnsIn(currentRows);
     const withAlso = currentRows.some(r => r.alsoInstalled);
+    const withPageName = parsed.type === 'vortex';
+    const pageCounts = exportedPageCounts(currentRows);
     const header = (withOrder ? ['#'] : [])
       .concat(['Name','Version'], withSize ? ['Size','Size (bytes)'] : [],
         withWhen ? ['Installed'] : [],
         withColl ? ['From collection'] : [], withEndo ? ['Endorsed'] : [],
         ['From same Nexus page'], withAlso ? ['Also installed'] : [],
-        ['Status','Source','Source URL']);
+        ['Status','Source','Source URL'], withPageName ? ['Mod Name'] : []);
     const lines = [header.join(',')];
     currentRows.forEach(r => {
+      const pageCount = pageCounts.get(r.sourceUrl);
       const fields = (withOrder ? [typeof r.order === 'number' ? r.order : ''] : [])
-        .concat([r.name, r.version],
+        .concat([r.fileName || r.name, r.version],
           withSize ? [csvBlank(formatSize(r.size)), typeof r.size === 'number' ? r.size : ''] : [],
           withWhen ? [csvBlank(installedLabel(r.installed))] : [],
           withColl ? [r.collectionText || ''] : [],
           withEndo ? [csvBlank(endorsementLabel(r.endorsed))] : [],
-          [r.pageSiblings > 1 ? r.pageSiblings : ''], withAlso ? [r.alsoInstalled || ''] : [],
-          [csvStatus(r.enabled), r.source, r.sourceUrl || '']);
+          [pageCount > 1 ? pageCount : ''], withAlso ? [r.alsoInstalled || ''] : [],
+          [csvStatus(r.enabled), r.source, r.sourceUrl || ''], withPageName ? [r.pageName || ''] : []);
       lines.push(fields.map(csvCell).join(','));
     });
     downloadCsv(exportName('.csv'), lines);
@@ -2940,20 +2958,23 @@
     const { rows, games } = allGamesExport(parsed, opts);
     const summary = bulkExportSummary(games, opts);
     writeStatus(bulkStatus, summary.text, summary.complete ? 'ok' : 'err');
-    // Fixed columns regardless of what each game happens to carry, so the
-    // sheet stays rectangular and sortable.
+    const withAlso = rows.some(r => r.alsoInstalled);
+    const pageCounts = exportedPageCounts(rows);
     const lines = [['Game','Name','Version','Size','Size (bytes)','Installed','From collection',
-      'Endorsed','From same Nexus page','Also installed','Status','Source','Source URL'].join(',')];
+      'Endorsed','From same Nexus page'].concat(withAlso ? ['Also installed'] : [],
+      ['Status','Source','Source URL','Mod Name']).join(',')];
     rows.forEach(r => {
+      const pageCount = pageCounts.get(r.sourceUrl);
       lines.push([
-        r.game, r.name, r.version,
+        r.game, r.fileName || r.name, r.version,
         csvBlank(formatSize(r.size)), typeof r.size === 'number' ? r.size : '',
         csvBlank(installedLabel(r.installed)),
         r.collectionText || '', csvBlank(endorsementLabel(r.endorsed)),
-        r.pageSiblings > 1 ? r.pageSiblings : '', r.alsoInstalled || '',
+        pageCount > 1 ? pageCount : '',
+      ].concat(withAlso ? [r.alsoInstalled || ''] : [], [
         csvStatus(r.enabled),
-        r.source, r.sourceUrl || '',
-      ].map(csvCell).join(','));
+        r.source, r.sourceUrl || '', r.pageName || '',
+      ]).map(csvCell).join(','));
     });
     setGamePickerOpen(false);
     downloadCsv(allGamesFileName(selectedGames, gamesWithMods(parsed).length), lines);
