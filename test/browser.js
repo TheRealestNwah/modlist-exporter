@@ -15,6 +15,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 // Windows dev machines and Linux CI runners, in that order. Anything else
 // simply reports no browser and the smoke test skips rather than fails.
@@ -35,35 +36,29 @@ function findBrowser() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function fileUrl(p) {
-  return 'file:///' + path.resolve(p).replace(/\\/g, '/');
-}
-
 // Opens index.html in a headless browser, hands `fn` an object for talking to
 // it, and always tears the browser down afterwards.
 async function withPage(fn) {
   const bin = findBrowser();
   if (!bin) throw new Error('no browser available');
 
-  // A random port and a throwaway profile, so a stray browser from an earlier
-  // run cannot be mistaken for this one.
-  const port = 9500 + Math.floor(Math.random() * 400);
+  // The browser chooses a free port and records it in this run's profile.
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'modlist-smoke-'));
-  const target = fileUrl(path.join(__dirname, '..', 'index.html'));
+  const target = pathToFileURL(path.join(__dirname, '..', 'index.html')).href;
 
   const proc = spawn(bin, [
     '--headless=new',
     '--disable-gpu',
     '--no-first-run',
     '--no-default-browser-check',
-    '--remote-debugging-port=' + port,
+    '--remote-debugging-port=0',
     '--user-data-dir=' + profile,
     target,
   ], { stdio: 'ignore' });
 
   let ws = null;
   try {
-    const page = await waitForPage(port);
+    const page = await waitForPage(profile, target);
     ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
       ws.onopen = res;
@@ -116,11 +111,12 @@ async function withPage(fn) {
 
     // The page is opened with the browser, so it may still be parsing.
     for (let i = 0; i < 40; i++) {
-      if (await evaluate('return !!document.getElementById("fileInput");')) break;
+      if (await evaluate('return document.readyState !== "loading" && !!document.getElementById("fileInput");')) {
+        return await fn({ evaluate, consoleErrors });
+      }
       await sleep(100);
     }
-
-    return await fn({ evaluate, consoleErrors });
+    throw new Error('the exporter page did not show its file input');
   } finally {
     if (ws) { try { ws.close(); } catch (e) { /* already gone */ } }
     proc.kill();
@@ -128,17 +124,21 @@ async function withPage(fn) {
   }
 }
 
-async function waitForPage(port) {
+async function waitForPage(profile, targetUrl) {
+  const portFile = path.join(profile, 'DevToolsActivePort');
   for (let i = 0; i < 60; i++) {
     await sleep(200);
     try {
+      const port = fs.readFileSync(portFile, 'utf8').split('\n')[0].trim();
+      if (!/^\d+$/.test(port)) continue;
       const res = await fetch('http://127.0.0.1:' + port + '/json/list');
       const targets = await res.json();
-      const page = targets.find((t) => t.type === 'page' && t.webSocketDebuggerUrl);
+      const page = targets.find((t) =>
+        t.type === 'page' && t.url === targetUrl && t.webSocketDebuggerUrl);
       if (page) return page;
     } catch (e) { /* endpoint not up yet */ }
   }
-  throw new Error('the browser never exposed a page to drive');
+  throw new Error('the browser never exposed the exporter page: ' + targetUrl);
 }
 
 module.exports = { findBrowser, withPage };
