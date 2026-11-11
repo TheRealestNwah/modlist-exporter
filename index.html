@@ -1653,6 +1653,13 @@
     return fileName || (a.modName ? String(a.modName) : '');
   }
 
+  function modPubArchive(name){
+    const match = String(name || '').trim().match(
+      /^(.+?)-([1-9]\d*)-[^-]+-\d{4}\.\d{2}\.\d{2}-\[mod\.pub\](?:\.(?:7z|zip|rar))?$/i
+    );
+    return match ? { name: match[1], id: match[2] } : null;
+  }
+
   // Vortex's game IDs are mostly the same as Nexus's URL domains, but not
   // always: a few games use IDs Nexus has retired or never used, and those
   // links go nowhere. Anything not listed is already its own domain. Takes
@@ -1700,17 +1707,22 @@
 
     let rows = Object.entries(gameMods).map(([modId, mod]) => {
       const attr = mod.attributes || {};
-      const name = vortexModName(attr, (pageCounts.get(modId) || 0) > 1) || modId;
+      const fileSource = attr.source || '';
+      const isCollection = mod.type === 'collection';
+      const modPub = !isCollection && (!fileSource || fileSource === 'mod.pub') &&
+        [attr.fileName, mod.installationPath, modId, attr.name, attr.customFileName, attr.logicalFileName]
+          .map(modPubArchive).find(Boolean);
+      const displayName = vortexModName(attr, (pageCounts.get(modId) || 0) > 1);
+      const name = modPub ? modPubArchive(displayName)?.name || displayName || modPub.name
+        : displayName || modId;
       // Unknown stays blank in the data, so every export writes an empty
       // cell. Only the on-screen table draws a dash for it.
       const version = attr.version || attr.newestVersion || '';
       const nexusModId = attr.modId;
-      const fileSource = attr.source || '';
       // A Nexus collection is installed as a mod, but it has no modId -- it
       // carries collectionSlug instead, and lives at a different URL shape.
       // Without this it renders as an ordinary nexus mod with nothing to
       // click, since the mod-page link can't be built.
-      const isCollection = mod.type === 'collection';
       let sourceUrl = null;
       let source = fileSource;
       // A mod can come from another game's Nexus section (Fallout 3 mods in a
@@ -1728,6 +1740,11 @@
         // The game and nexusModId come from the state file, so only build a
         // link when both look like what Nexus URLs actually contain.
         sourceUrl = 'https://www.nexusmods.com/' + nexusGame + '/mods/' + nexusModId;
+      } else if (modPub){
+        // A valid category and a placeholder slug let ModPub redirect by ID,
+        // including when the canonical page belongs to a different game.
+        sourceUrl = 'https://mod.pub/falloutnv/' + modPub.id + '-mod';
+        source = 'mod.pub';
       }
       let enabled = null;
       if (modState){

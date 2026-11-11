@@ -123,7 +123,7 @@ functions it lifts:
 `gamesWithMods`, `allGamesRows`,
 `allGamesExport`, `bulkExportSummary`, `allGamesFileName`,
 `formatSize`, `matchesQuery`, `statusLabel`, `csvCell`, `csvBlank`,
-`stripArchiveSuffix`, `vortexModName`, `diffDetail`,
+`stripArchiveSuffix`, `vortexModName`, `modPubArchive`, `diffDetail`,
 `mdCell`, `bbSafe`, `safeHttpUrl`, `mdLink`, `bbLink`, `markdownLines`,
 `bbcodeLines`, `markdownDiffLines`, `bbcodeDiffLines`, `installedAt`,
 `installedLabel`, `nexusPageCounts`, `nexusPageKey`, `groupByNexusPage`, `loadOrderFor`, `gamesWithLoadOrder`,
@@ -232,6 +232,8 @@ In both cases:
 - Sizes come from Vortex's `modSize` (falling back to `fileSize`), in bytes.
   The CSV export includes both the formatted size and the raw byte count, so
   it stays sortable in a spreadsheet.
+- For Vortex installs from ModPub, the archive's `[mod.pub]` suffix and mod ID
+  supply the source link and let the exporter trim the archive suffix from the name.
 - The search box filters on name, mod ID, version, source and collection
   name — so searching a collection finds its members. Multiple terms all have
   to match, in any order.
@@ -384,9 +386,11 @@ are just noise in a sheet about the two games you actually play.
 The export itself is the button inside the panel, which says what it will
 actually do — *Download 3 games CSV* — since it sits directly under the boxes
 that decide it. It writes one row per mod across the chosen games, with a `Game`
-column, fixed columns so the sheet stays rectangular, and both the formatted
-size and the raw byte count. The panel closes on Escape, and closes itself once
-the file is on its way.
+column and both the formatted size and the raw byte count. Vortex CSVs include
+the Nexus page title in `Mod Name` when available. `From same Nexus page` counts
+rows with the same Nexus mod link in that CSV. With **One row per Nexus page**
+enabled, `Also installed` appears when a grouped row has additional files to list.
+The panel closes on Escape and after downloading the file.
 
 The selection is always written in the file's own game order rather than the
 order the boxes were ticked, so exporting the same games twice produces the
